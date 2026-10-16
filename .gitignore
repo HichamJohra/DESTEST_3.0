@@ -1,0 +1,37 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+
+# --- PyCharm / IDEs ---
+.idea/
+.vscode/
+
+# --- OS files ---
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# --- Local secrets / settings ---
+.env
+
+# --- Simulation scratch files (uncomment if you run tools inside the repo) ---
+# dsin.txt
+# dslog.txt
+# dsres.mat
+# buildlog.txt
+# *.mat
+
+# --- Generated pages (uncomment to keep them out of the repo) ---
+# *_dashboard.html
+# *_graph.html
