@@ -6,6 +6,10 @@ build/
 dist/
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
 .ipynb_checkpoints/
 
 # --- Virtual environments ---
@@ -24,6 +28,11 @@ desktop.ini
 
 # --- Local secrets / settings ---
 .env
+
+# --- Generated output ---
+# documentation build (mkdocs build) and reports written by scripts/
+site/
+output/
 
 # --- Simulation scratch files (uncomment if you run tools inside the repo) ---
 # dsin.txt

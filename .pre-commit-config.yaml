@@ -1,0 +1,45 @@
+# Checks that run automatically before each `git commit` (after `uv run pre-commit install`).
+# Run them all by hand with:  uv run pre-commit run --all-files
+# CI runs exactly the same checks.
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^Result data/  # never rewrite submitted data files
+      - id: end-of-file-fixer
+        exclude: ^Result data/
+      - id: check-yaml
+        args: [--unsafe]  # mkdocs.yml uses custom YAML tags
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=20000]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.2
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.13.5
+    hooks:
+      - id: uv-lock  # keeps uv.lock in step with pyproject.toml
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (type check)
+        entry: uv run --frozen mypy
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      - id: check-result-names
+        name: result file names follow the DESTEST convention
+        entry: uv run --frozen destest check-names --errors-only
+        language: system
+        files: ^Result data/
