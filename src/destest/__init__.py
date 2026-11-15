@@ -2,7 +2,8 @@
 
 Sub-packages:
 
-- `destest.naming`: check and build result-file names
+- `destest.specs`: the rules, as YAML files (naming convention, one file per CME)
+- `destest.filename_check`: check and build result-file names
 
 Command line:
 

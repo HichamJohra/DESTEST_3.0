@@ -1,4 +1,4 @@
-"""Tests for destest.naming. Run with:  uv run pytest"""
+"""Tests for destest.filename_check. Run with:  uv run pytest"""
 
 from datetime import datetime
 from pathlib import Path
@@ -6,28 +6,30 @@ from pathlib import Path
 import pytest
 
 from destest.cli import main
-from destest.naming import (
+from destest.filename_check import (
+    NameCheck,
     check_files,
     check_folder,
     check_name,
     describe,
     make_filename,
+    partner_names,
     template,
     write_csv,
 )
+from destest.filename_check import convention as conv
 
 NOW = datetime(2026, 10, 24, 12, 0, 0)
 VALID = "ResultData_DESTEST_CME_DHN_1_TRNSYS_2022_TUD_Clemens_Felsmann_2022_01_01_12_00_00.csv"
 
-# The result files in "Result data/CME_DHN_1" (renamed October 2026).
-REPO_FILES = [
-    "ResultData_DESTEST_CME_DHN_1_Modelica_Buildings_AAU_Alessandro_Maccarini_2022_01_01_12_00_00.csv",
-    "ResultData_DESTEST_CME_DHN_1_Modelica_Buildings_AAU_Jerome_Laluce_2022_01_01_12_00_00.csv",
-    "ResultData_DESTEST_CME_DHN_1_Modelica_Buildings_AAU_Martin_Frandsen_2022_01_01_12_00_00.csv",
-    "ResultData_DESTEST_CME_DHN_1_SIM VICUS_-_TUD_Hauke_Hirsch_2022_01_01_12_00_00.csv",
-    "ResultData_DESTEST_CME_DHN_1_TRNSYS_2021_TUD_Clemens_Felsmann_2021_01_01_12_00_00.csv",
-    "ResultData_DESTEST_CME_DHN_1_TRNSYS_2022_TUD_Clemens_Felsmann_2022_01_01_12_00_00.csv",
-]
+# Every file in the repository's "Result data" folder (all sub-folders) is checked,
+# so new submissions are tested as soon as they are added - no list to keep up to date.
+RESULT_DATA = Path(__file__).resolve().parents[1] / "Result data"
+REPO_CHECKS = check_folder(RESULT_DATA, recursive=True) if RESULT_DATA.is_dir() else []
+
+# Two existing names, kept here to test the warnings they are known to give.
+MODELICA_NAME = "ResultData_DESTEST_CME_DHN_1_Modelica_Buildings_AAU_Alessandro_Maccarini_2022_01_01_12_00_00.csv"
+SIM_VICUS_NAME = "ResultData_DESTEST_CME_DHN_1_SIM VICUS_-_TUD_Hauke_Hirsch_2022_01_01_12_00_00.csv"
 
 
 def errors(name: str) -> list[str]:
@@ -49,25 +51,36 @@ def test_valid_name_is_parsed() -> None:
     assert not r.warnings
     assert r.values["data_type"] == "ResultData"
     assert r.values["series"] == "DHN"
-    assert r.values["number"] == 1
+    assert r.values["exercise_number"] == 1
     assert r.values["tool"] == "TRNSYS"
     assert r.values["tool_version"] == "2022"
     assert r.values["institution"] == "TUD"
     assert r.values["last_name"] == "Felsmann"
-    assert r.values["created"] == datetime(2022, 1, 1, 12, 0, 0)
+    assert r.values["creation_date_time"] == datetime(2022, 1, 1, 12, 0, 0)
     assert r.extension == ".csv"
 
 
-@pytest.mark.parametrize("name", REPO_FILES)
-def test_files_in_repo_are_valid(name: str) -> None:
-    assert errors(name) == []
+def test_result_data_folder_has_files() -> None:
+    if not RESULT_DATA.is_dir():
+        pytest.skip(f"No '{RESULT_DATA.name}' folder next to the tests")
+    assert REPO_CHECKS, f"No files found in {RESULT_DATA}"
 
 
-def test_files_in_repo_get_the_expected_warnings() -> None:
+@pytest.mark.parametrize(
+    "check",
+    REPO_CHECKS,
+    ids=[c.path.relative_to(RESULT_DATA).as_posix() if c.path else "?" for c in REPO_CHECKS],
+)
+def test_files_in_repo_are_valid(check: NameCheck) -> None:
+    # name and folder (CME_<Series>_<Number>) are both checked
+    assert [f"{i.field}: {i.message}" for i in check.errors] == []
+
+
+def test_known_names_get_the_expected_warnings() -> None:
     # 'Modelica_Buildings' is read as tool 'Modelica', version 'Buildings'
-    assert any("contains no digit" in w for w in warnings(REPO_FILES[0]))
+    assert any("contains no digit" in w for w in warnings(MODELICA_NAME))
     # 'SIM VICUS' has a space, and the version is '-'
-    w = warnings(REPO_FILES[3])
+    w = warnings(SIM_VICUS_NAME)
     assert any("spaces" in x for x in w)
     assert any("'-' contains no digit" in x for x in w)
 
@@ -75,7 +88,8 @@ def test_files_in_repo_get_the_expected_warnings() -> None:
 @pytest.mark.parametrize(
     "name",
     [
-        "ResultMetadata_DESTEST_CME_DEL_0_PowerFactory_2024-SP1_SINTEF_Ola_Nordmann_2026_01_31_23_59_59.json",
+        "ResultMetadata_DESTEST_CME_DEL_0_PowerFactory_2024-SP1_SINTEF_Ola_Nordmann_2026_01_31_23_59_59.yaml",
+        "ResultData_DESTEST_CME_DCN_2_TRNSYS_18.4_DTU_Ana_Silva_2026_03_07_09_05_00.csv",
         "ResultData_DESTEST_CME_DHN_12_Modelica-Buildings_11.0.0_AAU_Jean-Luc_Dupont_2025_02_28_00_00_00.csv",
         "ResultData_DESTEST_CME_DHN_3_SIM-VICUS_1.1_TUD_Bjørn_Ødegård_2024_02_29_08_30_00.csv",
     ],
@@ -93,22 +107,51 @@ def test_path_is_reduced_to_file_name() -> None:
 def test_make_filename_round_trip() -> None:
     name = make_filename(
         series="DHN",
-        number=1,
+        exercise_number=1,
         data_type="ResultData",
         tool="TRNSYS",
         tool_version="2022",
         institution="TUD",
         first_name="Clemens",
         last_name="Felsmann",
-        created=datetime(2022, 1, 1, 12, 0, 0),
+        creation_date_time=datetime(2022, 1, 1, 12, 0, 0),
     )
-    assert name == VALID
+    assert name == VALID  # extension .csv chosen from the data type
+
+
+def test_make_filename_metadata_gets_yaml_extension() -> None:
+    name = make_filename(
+        series="DHN",
+        exercise_number=1,
+        data_type="ResultMetadata",
+        tool="TRNSYS",
+        tool_version="2022",
+        institution="TUD",
+        first_name="Clemens",
+        last_name="Felsmann",
+        creation_date_time=datetime(2022, 1, 1, 12, 0, 0),
+    )
+    assert name == VALID.replace("ResultData", "ResultMetadata").replace(".csv", ".yaml")
+
+
+def test_make_filename_missing_and_unknown_parts() -> None:
+    with pytest.raises(ValueError, match=r"missing: .*institution.*unknown: number"):
+        make_filename(
+            series="DHN",
+            number=1,
+            exercise_number=1,
+            data_type="ResultData",
+            tool="T",
+            tool_version="1",
+            first_name="A",
+            last_name="B",
+        )
 
 
 def _make(series: str = "DHN", tool: str = "TRNSYS") -> str:
     return make_filename(
         series=series,
-        number=1,
+        exercise_number=1,
         data_type="ResultData",
         tool=tool,
         tool_version="1",
@@ -127,7 +170,11 @@ def test_make_filename_rejects_bad_parts() -> None:
 
 def test_template_and_description() -> None:
     assert template().startswith("<DataType>_DESTEST_CME_<Series>_<Number>_<ModellingTool>")
-    assert "District Heating Network" in describe()
+    text = describe()
+    assert "District Heating Network" in text
+    assert "District Cooling Network" in text
+    assert "Extension of ResultMetadata files: .yaml" in text
+    assert "Folder: CME_<Series>_<Number>" in text
 
 
 # ---- data type position and fixed markers ------------------------------------
@@ -154,13 +201,13 @@ def test_data_type_in_wrong_place_is_reported_once(name: str) -> None:
 
 def test_destest_marker_wrong_case() -> None:
     assert errors(VALID.replace("_DESTEST_", "_Destest_")) == [
-        "DESTEST marker must be written 'DESTEST' (found 'Destest')."
+        "DESTEST CME marker must be written 'DESTEST_CME' (found 'Destest_CME')."
     ]
 
 
 def test_cme_marker_wrong_case() -> None:
     assert errors(VALID.replace("_CME_", "_cme_")) == [
-        "CME marker must be written 'CME' (found 'cme')."
+        "DESTEST CME marker must be written 'DESTEST_CME' (found 'DESTEST_cme')."
     ]
 
 
@@ -179,7 +226,7 @@ def test_series_wrong_case() -> None:
 
 def test_unknown_series_with_suggestion() -> None:
     (e,) = errors(VALID.replace("_DHN_", "_DHM_"))
-    assert "not in the list (DHN, DEL)" in e
+    assert "not in the list (DHN, DCN, DEL)" in e
     assert "Did you mean 'DHN'?" in e
 
 
@@ -189,8 +236,9 @@ def test_unknown_data_type() -> None:
 
 
 def test_metadata_spelling() -> None:
-    assert errors(VALID.replace("ResultData", "ResultMetadata")) == []
-    assert errors(VALID.replace("ResultData", "ResultMetaData")) == [
+    metadata = VALID.replace(".csv", ".yaml")
+    assert errors(metadata.replace("ResultData", "ResultMetadata")) == []
+    assert errors(metadata.replace("ResultData", "ResultMetaData")) == [
         "Data type must be written 'ResultMetadata' (found 'ResultMetaData')."
     ]
 
@@ -198,7 +246,7 @@ def test_metadata_spelling() -> None:
 # ---- integer ---------------------------------------------------------------
 @pytest.mark.parametrize("bad", ["1a", "-1", "one"])
 def test_number_must_be_integer(bad: str) -> None:
-    assert error_fields(VALID.replace("_DHN_1_", f"_DHN_{bad}_")) == {"number"}
+    assert error_fields(VALID.replace("_DHN_1_", f"_DHN_{bad}_")) == {"exercise_number"}
 
 
 def test_number_zero_is_valid_and_leading_zero_warns() -> None:
@@ -209,7 +257,7 @@ def test_number_zero_is_valid_and_leading_zero_warns() -> None:
 # ---- free text ---------------------------------------------------------------
 def test_empty_free_field() -> None:
     assert errors(VALID.replace("_2022_TUD_", "__TUD_")) == [
-        "Tool version is empty (two '_' in a row?)."
+        "Modelling tool version is empty (two '_' in a row?)."
     ]
 
 
@@ -220,7 +268,7 @@ def test_underscore_inside_free_field_is_pinpointed() -> None:
     # the fields outside the free-text block are still read and checked
     r = check_name(name, now=NOW)
     assert r.values["series"] == "DHN"
-    assert r.values["created"] == datetime(2022, 1, 1, 12, 0, 0)
+    assert r.values["creation_date_time"] == datetime(2022, 1, 1, 12, 0, 0)
 
 
 def test_missing_free_field() -> None:
@@ -246,7 +294,7 @@ def test_invalid_date() -> None:
 
 
 def test_invalid_time() -> None:
-    assert error_fields(VALID.replace("_12_00_00", "_25_00_00")) == {"created"}
+    assert error_fields(VALID.replace("_12_00_00", "_25_00_00")) == {"creation_date_time"}
 
 
 def test_timestamp_digit_count() -> None:
@@ -263,13 +311,31 @@ def test_name_too_short() -> None:
 
 
 # ---- extension -------------------------------------------------------------
-def test_missing_extension_warns_and_dot_in_version_is_not_an_extension() -> None:
+def test_missing_extension_is_an_error_and_dot_in_version_is_not_an_extension() -> None:
     name = VALID.replace("_2022_TUD_", "_18.4_TUD_")[: -len(".csv")]
     r = check_name(name, now=NOW)
-    assert r.ok
     assert r.extension == ""
-    assert any("no extension" in w.message for w in r.warnings)
+    assert [(i.field, i.message) for i in r.errors] == [
+        ("extension", "File has no extension (.csv for ResultData).")
+    ]
     assert r.values["tool_version"] == "18.4"
+
+
+@pytest.mark.parametrize(
+    ("name", "allowed"),
+    [
+        (VALID.replace(".csv", ".xlsx"), ".csv"),
+        (VALID.replace("ResultData", "ResultMetadata"), ".yaml"),  # metadata as .csv
+        (VALID.replace("ResultData", "ResultMetadata").replace(".csv", ".json"), ".yaml"),
+    ],
+)
+def test_extension_must_fit_the_data_type(name: str, allowed: str) -> None:
+    (e,) = errors(name)
+    assert e.endswith(f"files; use {allowed}.")
+
+
+def test_extension_case_is_ignored() -> None:
+    assert errors(VALID.replace(".csv", ".CSV")) == []
 
 
 # ---- folder consistency ----------------------------------------------------
@@ -277,8 +343,10 @@ def test_file_in_matching_folder_is_ok(tmp_path: Path) -> None:
     f = tmp_path / "CME_DHN_1" / VALID
     f.parent.mkdir()
     f.write_text("x")
+    (f.parent / VALID.replace("ResultData", "ResultMetadata").replace(".csv", ".yaml")).touch()
     (r,) = check_files([f], now=NOW)
     assert r.ok
+    assert r.issues == []
 
 
 def test_file_in_wrong_folder_is_an_error(tmp_path: Path) -> None:
@@ -286,30 +354,77 @@ def test_file_in_wrong_folder_is_an_error(tmp_path: Path) -> None:
     f.parent.mkdir()
     f.write_text("x")
     (r,) = check_files([f], now=NOW)
-    assert [i.field for i in r.errors] == ["folder"]
+    assert [i.field for i in r.errors if i.field != "pairing"] == ["folder"]
     assert "folder 'CME_DHN_2' but its name says DHN 1" in r.errors[0].message
+
+
+# ---- pairing of data and metadata files --------------------------------------
+METADATA = VALID.replace("ResultData", "ResultMetadata").replace(".csv", ".yaml")
+
+
+def _files(tmp_path: Path, *names: str) -> list[Path]:
+    folder = tmp_path / "CME_DHN_1"
+    folder.mkdir()
+    for n in names:
+        (folder / n).write_text("x")
+    return [folder / n for n in names]
+
+
+def test_partner_names() -> None:
+    assert partner_names(check_name(VALID, now=NOW)) == [METADATA]
+    assert partner_names(check_name(METADATA, now=NOW)) == [VALID]
+    assert partner_names(check_name("bad_name.csv")) == []
+
+
+def test_data_and_metadata_together_are_ok(tmp_path: Path) -> None:
+    checks = check_files(_files(tmp_path, VALID, METADATA), now=NOW)
+    assert [i for c in checks for i in c.issues] == []
+
+
+def test_data_without_metadata(tmp_path: Path) -> None:
+    (r,) = check_files(_files(tmp_path, VALID), now=NOW)
+    (issue,) = r.issues
+    assert issue.field == "pairing"
+    assert issue.level == conv.PAIRING_SEVERITY
+    assert issue.message == f"No matching metadata file: expected '{METADATA}' in the same folder."
+
+
+def test_metadata_without_data_warns(tmp_path: Path) -> None:
+    (r,) = check_files(_files(tmp_path, METADATA), now=NOW)
+    assert r.ok
+    assert [(i.field, i.level) for i in r.issues] == [("pairing", "warning")]
+
+
+def test_pairing_needs_the_same_name(tmp_path: Path) -> None:
+    other = METADATA.replace("Clemens", "Clement")
+    checks = check_files(_files(tmp_path, VALID, other), now=NOW)
+    assert [i.field for c in checks for i in c.issues] == ["pairing", "pairing"]
+
+
+def test_name_check_alone_does_not_look_for_partner() -> None:
+    assert check_name(VALID, now=NOW).issues == []
 
 
 # ---- folders, CSV and command line -----------------------------------------
 @pytest.fixture
 def result_folder(tmp_path: Path) -> Path:
     (tmp_path / VALID).write_text("x")
+    (tmp_path / METADATA).write_text("x")
     (tmp_path / "Modelica_Buildings_AAU_JL_Network_0.csv").write_text("x")
     (tmp_path / ".hidden").write_text("x")
     sub = tmp_path / "CME_DEL_1"
     sub.mkdir()
     (sub / VALID.replace("_DHN_", "_DEL_")).write_text("x")
+    (sub / METADATA.replace("_DHN_", "_DEL_")).write_text("x")
     return tmp_path
 
 
 def test_check_folder(result_folder: Path) -> None:
     flat = check_folder(result_folder, now=NOW)
-    assert [c.ok for c in flat] == [
-        False,
-        True,
-    ]  # sorted by name (Modelica... first), .hidden skipped
+    # sorted by name (Modelica... first), .hidden skipped
+    assert [c.ok for c in flat] == [False, True, True]
     deep = check_folder(result_folder, recursive=True, now=NOW)
-    assert len(deep) == 3
+    assert len(deep) == 5
     assert all(c.ok for c in deep if c.path is not None and c.path.parent.name == "CME_DEL_1")
 
 
@@ -327,20 +442,20 @@ def test_write_csv(result_folder: Path, tmp_path: Path) -> None:
 
 def test_cli_check_names(result_folder: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["check-names", str(result_folder)]) == 1
-    assert "Summary: 1 valid, 1 with errors - 2 files checked." in capsys.readouterr().out
+    assert "Summary: 2 valid, 1 with errors - 3 files checked." in capsys.readouterr().out
     assert main(["check-names", VALID]) == 0
     assert main(["check-names", str(result_folder / "missing_dir")]) == 1  # treated as a bare name
 
 
 def test_cli_make_name_and_convention(capsys: pytest.CaptureFixture[str]) -> None:
-    args = ["make-name", "--series", "DHN", "--number", "1", "--data-type", "ResultData"]
+    args = ["make-name", "--series", "DHN", "--exercise-number", "1", "--data-type", "ResultData"]
     args += ["--tool", "TRNSYS", "--tool-version", "2022", "--institution", "TUD"]
     args += [
         "--first-name",
         "Clemens",
         "--last-name",
         "Felsmann",
-        "--created",
+        "--creation-date-time",
         "2022-01-01 12:00:00",
     ]
     assert main(args) == 0

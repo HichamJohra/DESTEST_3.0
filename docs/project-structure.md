@@ -14,15 +14,21 @@ DESTEST_3.0/
 │       ├── __main__.py       allows `python -m destest ...`
 │       ├── cli.py            the `destest` command and its sub-commands
 │       ├── py.typed          tells type checkers the package has type hints
-│       └── naming/           result-file naming convention
-│           ├── convention.py   the rules (edit here when the convention changes)
+│       ├── specs/            the rules, as YAML files (edit these, not the code)
+│       │   ├── naming_convention.yaml   file-name rules, shared by all CMEs
+│       │   ├── cme/CME_DHN_1.yaml       content rules, one file per CME
+│       │   ├── schema.py                the allowed layout of those files (pydantic)
+│       │   └── __init__.py              load_naming_convention(), load_cme_spec()
+│       └── filename_check/   check and build result-file names (naming convention)
+│           ├── convention.py   reads specs/naming_convention.yaml for the checker
 │           ├── validate.py     check a name, a list of files or a folder
 │           ├── build.py        build a correct name
 │           └── report.py       text report and CSV export
 ├── scripts/                  ready-to-run tasks (click Run in PyCharm)
 │   └── check_result_names.py
 ├── tests/                    automatic tests
-│   └── test_naming.py
+│   ├── test_filename_check.py
+│   └── test_specs.py
 ├── docs/                     this documentation (Markdown)
 └── .github/
     ├── workflows/ci.yml      tests + checks on every push and pull request
@@ -38,6 +44,8 @@ DESTEST_3.0/
 | A new topic with several functions | a new sub-package: a folder in `src/destest/` with an `__init__.py` |
 | Something you run to get a job done | a script in `scripts/` that imports from `destest` |
 | A task others should run from the terminal | a sub-command in `src/destest/cli.py` |
+| A rule a file must follow (name, columns, ranges, metadata keys) | the YAML files in `src/destest/specs/` |
+| A new common modelling exercise | copy `specs/cme/CME_DHN_1.yaml` to `CME_<Series>_<Number>.yaml` and edit it |
 | A check that a function works | a `tests/test_<topic>.py` file |
 | A third-party package the code needs | `uv add <package>` (updates `pyproject.toml` and `uv.lock`) |
 
@@ -50,4 +58,4 @@ Possible next sub-packages: `destest.io` (read result and metadata files),
 The package lives in `src/destest/`, not directly in the repository root. Python then
 cannot import it by accident from the current folder; tests and scripts always use the
 installed package, so packaging mistakes show up on your machine first. You never type
-`src` in code: imports are `from destest.naming import ...`.
+`src` in code: imports are `from destest.filename_check import ...`.

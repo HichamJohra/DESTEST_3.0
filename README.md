@@ -37,7 +37,7 @@ Published site: <https://hichamjohra.github.io/DESTEST_3.0/>
 ## Repository layout
 
 ```text
-src/destest/     the library (sub-package per topic, e.g. naming/)
+src/destest/     the library (sub-package per topic, e.g. filename_check/)
 scripts/         ready-to-run tasks
 tests/           automatic tests
 docs/            documentation site (MkDocs)

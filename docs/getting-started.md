@@ -48,20 +48,22 @@ can be used in scripts and CI.
 ## 4. Create a correct file name
 
 ```bash
-uv run destest make-name --series DHN --number 1 --data-type ResultData \
+uv run destest make-name --data-type ResultData --series DHN --exercise-number 1 \
     --tool TRNSYS --tool-version 2022 --institution TUD \
     --first-name Clemens --last-name Felsmann
 ```
 
 prints something like
 `ResultData_DESTEST_CME_DHN_1_TRNSYS_2022_TUD_Clemens_Felsmann_2026_10_24_12_31_05.csv`
-(the time stamp is the current time unless `--created` is given). Use
-`--data-type ResultMetadata` for the matching metadata file.
+(the time stamp is the current time unless `--creation-date-time` is given). Use
+`--data-type ResultMetadata` for the matching metadata file (it gets `.yaml`).
+The options follow the parts defined in `specs/naming_convention.yaml`;
+`uv run destest make-name --help` lists them.
 
 ## From Python
 
 ```python
-from destest.naming import check_folder, print_report
+from destest.filename_check import check_folder, print_report
 
 checks = check_folder("Result data", recursive=True)
 print_report(checks)

@@ -13,15 +13,18 @@ type, stored in a folder named after the exercise, `CME_<Series>_<Number>`:
 Result data/
 └── CME_DHN_1/
     ├── ResultData_DESTEST_CME_DHN_1_TRNSYS_2022_TUD_Clemens_Felsmann_2022_01_01_12_00_00.csv
-    └── ResultMetadata_DESTEST_CME_DHN_1_TRNSYS_2022_TUD_Clemens_Felsmann_2022_01_01_12_00_00.<ext>
+    └── ResultMetadata_DESTEST_CME_DHN_1_TRNSYS_2022_TUD_Clemens_Felsmann_2022_01_01_12_00_00.yaml
 ```
+
+The rules below are defined in one file, `src/destest/specs/naming_convention.yaml`.
+The checker, `destest make-name`, `destest convention` and this table follow it;
+`uv run destest convention` prints the rules as currently defined.
 
 | Part | Rule |
 |---|---|
 | `<DataType>` | One of `ResultData`, `ResultMetadata` – always first |
-| `DESTEST` | Mandatory, exactly as written |
-| `CME` | Mandatory, exactly as written |
-| `<Series>` | One of `DHN` (District Heating Network), `DEL` (Distribution Electrical Grid) |
+| `DESTEST_CME` | Mandatory, exactly as written, right after the data type |
+| `<Series>` | One of `DHN` (District Heating Network), `DCN` (District Cooling Network), `DEL` (Distribution Electrical Grid) |
 | `<Number>` | Exercise number in the series, a whole number: `0`, `1`, `2`, … |
 | `<ModellingTool>` | Name of the modelling tool – free text, not empty |
 | `<ToolVersion>` | Version of the modelling tool – free text, not empty |
@@ -29,13 +32,14 @@ Result data/
 | `<FirstName>` | First name of the modeller – free text, not empty |
 | `<LastName>` | Last name of the modeller – free text, not empty |
 | `<YYYY>_<MM>_<DD>_<hh>_<mm>_<ss>` | Date and time the file was created; must be a real date and time |
+| `.<ext>` | `.csv` for `ResultData`, `.yaml` for `ResultMetadata` |
 
 ## Rules that follow from the format
 
 - **No `_` inside a part.** The underscore separates the parts, so a tool or person
   name cannot contain one. Write `Modelica-Buildings` or `ModelicaBuildings`, not
   `Modelica_Buildings`; `Jean-Luc`, not `Jean_Luc`.
-- **Exact spelling and case** for `DESTEST`, `CME`, the series and the data type
+- **Exact spelling and case** for `DESTEST_CME`, the series and the data type
   (`ResultMetadata`, not `ResultMetaData`).
 - **Fixed digit counts** in the time stamp: 4 for the year, 2 for everything else
   (`2026_03_07_09_05_00`).
@@ -47,8 +51,8 @@ Result data/
 
 | Severity | What |
 |---|---|
-| Error | Data type not first, or not in the list; missing or misspelled `DESTEST`/`CME`; series not in the list or in the wrong place; number not a whole number; empty part; too many or too few parts; time stamp not a valid date/time or wrong digit count; file in a folder for another exercise |
-| Warning | Leading zero in the number (`01`); spaces in a part; tool version without any digit (often a sign that a part is missing); time stamp in the future; no file extension |
+| Error | Data type not first, or not in the list; missing or misspelled `DESTEST_CME`; series not in the list or in the wrong place; number not a whole number; empty part; too many or too few parts; time stamp not a valid date/time or wrong digit count; no extension, or an extension not allowed for the data type; file in a folder for another exercise |
+| Warning | Leading zero in the number (`01`); spaces in a part; tool version without any digit (often a sign that a part is missing); tool name without any letter; time stamp in the future; data file without its metadata file (for now, see below); metadata file without its data file |
 
 A file passes when it has no errors. Warnings are shown but do not fail the check.
 
@@ -58,9 +62,18 @@ A file passes when it has no errors. Warnings are shown but do not fail the chec
     as tool `Modelica`, version `Buildings`. The checker flags this with the
     "tool version contains no digit" warning, but cannot be certain.
 
-## Open points
+## Changing the convention
 
-- **Changing the order.** The order of the parts is defined once, in `FIELDS` in
-  `src/destest/naming/convention.py`; the checker, `make-name` and the template follow it.
-- **Allowed file extensions** per data type (e.g. `.csv` for `ResultData`) are not
-  specified yet; set `ALLOWED_EXTENSIONS` in `convention.py` once agreed.
+Edit `src/destest/specs/naming_convention.yaml`: add a series or a data type to its
+list, change the order of the parts, or the allowed extensions. The file is checked
+when it is loaded; a typo or an unknown key stops with a message naming the place in
+the file. Run `uv run destest specs` to check it, then `uv run pytest`.
+
+## Data and metadata files come in pairs
+
+When files are checked on disk (`destest check-names`), every `ResultData` file must
+have its `ResultMetadata` file in the same folder: the same name with the other data
+type and `.yaml`. A missing metadata file is reported at the level set by
+`pairing.severity` in the YAML file. It is **`warning` for now**, because no metadata
+file has been submitted yet; set it to `error` once they are in. A metadata file
+without its data file always gives a warning.

@@ -14,7 +14,10 @@ license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Hicham Johra" }]
 requires-python = ">=3.11"
-dependencies = []  # the naming checker uses only the standard library
+dependencies = [
+    "pydantic>=2.11",  # checks the YAML spec files and gives clear error messages
+    "pyyaml>=6.0.2",   # reads the YAML spec files
+]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
@@ -38,6 +41,7 @@ dev = [
     "pytest>=9.1",
     "pytest-cov>=7.1",
     "ruff>=0.17",
+    "types-pyyaml>=6.0",  # type hints of PyYAML, for mypy
 ]
 docs = [
     "mkdocs>=1.6,<2",  # MkDocs 2 is a rewrite; stay on 1.x until the theme supports it

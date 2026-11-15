@@ -4,7 +4,7 @@ Generated from the docstrings in `src/destest`.
 
 ## Checking names
 
-::: destest.naming.validate
+::: destest.filename_check.validate
     options:
       members:
         - check_name
@@ -16,21 +16,37 @@ Generated from the docstrings in `src/destest`.
 
 ## Building names
 
-::: destest.naming.build
+::: destest.filename_check.build
 
 ## Reports
 
-::: destest.naming.report
+::: destest.filename_check.report
 
 ## The convention
 
-::: destest.naming.convention
+::: destest.filename_check.convention
     options:
       members:
         - SERIES
         - DATA_TYPES
-        - ALLOWED_EXTENSIONS
+        - EXTENSIONS
         - FIELDS
         - Field
         - template
         - describe
+
+## Spec files
+
+::: destest.specs
+    options:
+      members:
+        - load_naming_convention
+        - load_cme_spec
+        - list_cme_specs
+        - SpecError
+
+::: destest.specs.schema
+    options:
+      members:
+        - NamingConvention
+        - CmeSpec

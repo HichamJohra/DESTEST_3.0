@@ -1,0 +1,292 @@
+# =============================================================================
+# DESTEST 3.0 - Content rules for CME DHN 1
+# =============================================================================
+# One file like this per CME: copy it, rename it to CME_<Series>_<Number>.yaml and edit.
+# Read by destest (content checks of ResultData and ResultMetadata files - in progress).
+# Checked on load against the rules in destest/specs/schema.py.
+# Values marked "TO BE AGREED" are proposals.
+#
+# Severity of a failed rule:  error   -> file is rejected
+#                             warning -> file is accepted, the issue is reported
+# =============================================================================
+
+schema_version: 1
+
+cme:
+  series: DHN
+  exercise_number: 1           # CE 1 of the DHN series
+  title: District heating network in steady state
+  status: draft
+
+# =============================================================================
+# ResultData file (.csv)
+# =============================================================================
+result_data:
+
+  file:
+    extension: .csv
+    encoding: utf-8            # a UTF-8 byte-order mark (Excel export) is accepted
+    delimiter: ","
+    decimal: "."
+    header_rows: 1
+
+  rows:                        # data rows, header not counted
+    min: 2                     # error if fewer
+    expected: 10               # warning if different: 10 samples with a 1-second time step
+    max: 10                    # error if more
+
+  header:
+    match: exact               # every column name must be exactly as in `columns` (error otherwise)
+    order: strict              # columns must be in the order of `columns`
+    extra_columns: error       # error | warning | ignore
+
+  # Rules applied to every column unless the column overrides them.
+  column_defaults:
+    type: number
+    missing_values:
+      - ""
+      - " "
+      - "NaN"
+      - "nan"
+      - "NA"
+    all_missing: error         # a column with no value at all
+    max_missing_fraction: 0    # share of missing values allowed (0 = none)
+    on_missing: error
+
+  time:
+    column: time
+    unit: s
+    start: 0
+    step: 1
+    strictly_increasing: true
+
+  on_out_of_range: warning     # what happens when a value is outside a column's `range`
+
+  # One entry per column, in file order.
+  #   key        short id used in code and reports
+  #   header     exact text expected in the CSV header
+  #   unit       for reference (it is also part of the header text)
+  #   range      plausible values: min and/or max (leave one out for no limit)
+  columns:
+    - key: time
+      header: "Time [s]"
+      unit: s
+
+    - key: m_flow_supply_i
+      header: "Mass flow rate supply i [kg/h]"
+      unit: kg/h
+      range:
+        min: 0
+
+    - key: dp_supply_i_e
+      header: "Pressure drop supply between i and e [Pa]"
+      unit: Pa
+      range:
+        min: 0
+
+    - key: dp_return_a_i
+      header: "Pressure drop return between a and i [Pa]"
+      unit: Pa
+      range:
+        min: 0
+
+    - key: dp_return_i_h
+      header: "Pressure drop return between i and h [Pa]"
+      unit: Pa
+      range:
+        min: 0
+
+    - key: T_supply_i
+      header: "Fluid temperature supply i [C]"
+      unit: degC
+      range:
+        min: 0
+        max: 120
+
+    - key: T_supply_h
+      header: "Fluid temperature supply h [C]"
+      unit: degC
+      range:
+        min: 0
+        max: 120
+
+    - key: T_supply_g
+      header: "Fluid temperature supply g [C]"
+      unit: degC
+      range:
+        min: 0
+        max: 120
+
+    - key: T_supply_f
+      header: "Fluid temperature supply f [C]"
+      unit: degC
+      range:
+        min: 0
+        max: 120
+
+    - key: T_supply_e
+      header: "Fluid temperature supply e [C]"
+      unit: degC
+      range:
+        min: 0
+        max: 120
+
+    - key: T_supply_district
+      header: "Fluid temperature supply SimpleDistrict_1 [C]"
+      unit: degC
+      range:
+        min: 0
+        max: 120
+
+    - key: T_return_i
+      header: "Fluid temperature return i [C]"
+      unit: degC
+      range:
+        min: 0
+        max: 120
+
+    - key: T_return_h
+      header: "Fluid temperature return h [C]"
+      unit: degC
+      range:
+        min: 0
+        max: 120
+
+    - key: T_return_g
+      header: "Fluid temperature return g [C]"
+      unit: degC
+      range:
+        min: 0
+        max: 120
+
+    - key: T_return_f
+      header: "Fluid temperature return f [C]"
+      unit: degC
+      range:
+        min: 0
+        max: 120
+
+    - key: T_return_e
+      header: "Fluid temperature return e [C]"
+      unit: degC
+      range:
+        min: 0
+        max: 120
+
+    - key: T_return_district
+      header: "Fluid temperature return SimpleDistrict_1 [C]"
+      unit: degC
+      range:
+        min: 0
+        max: 120
+
+    - key: Q_loss_supply_i_h
+      header: "Heat loss supply between i and h [W]"
+      unit: W
+      range:
+        min: 1
+
+    - key: Q_supplied
+      header: "Total heat load supplied by heat source [W]"
+      unit: W
+      range:
+        min: 0
+
+  # Checks across columns (optional). Each is evaluated row by row.
+  consistency:
+    - name: Heat supplied matches m_flow * cp * (T_supply - T_return)
+      expression: "Q_supplied ≈ m_flow_supply_i / 3600 * 4180 * (T_supply_i - T_return_i)"
+      tolerance_relative: 0.01
+      severity: warning
+
+    - name: Supply temperature above return temperature
+      expression: "T_supply_i > T_return_i"
+      severity: error
+
+# =============================================================================
+# ResultMetadata file (.yaml)
+# =============================================================================
+result_metadata:
+
+  file:
+    extension: .yaml
+
+  unknown_keys: warning        # keys not listed below
+
+  # Keys the modeller fills in. type: text | integer | number | date | datetime | choice | list
+  fields:
+    # --- Must agree with the file name (checked against it) ---
+    - key: modelling_tool
+      type: text
+      required: true
+      matches_name_part: tool
+
+    - key: tool_version
+      type: text
+      required: true
+      matches_name_part: tool_version
+
+    - key: institution
+      type: text
+      required: true
+      matches_name_part: institution
+
+    - key: first_name
+      type: text
+      required: true
+      matches_name_part: first_name
+
+    - key: last_name
+      type: text
+      required: true
+      matches_name_part: last_name
+
+    - key: creation_date_time
+      type: datetime
+      required: true
+      matches_name_part: creation_date_time
+
+    # --- About the model and the simulation (proposals, TO BE AGREED) ---
+    - key: library
+      type: text
+      required: false
+      example: "Modelica Buildings 11.0.0"
+
+    - key: solver
+      type: text
+      required: false
+
+    - key: time_step_s
+      type: number
+      required: true
+      range:
+        min: 0
+
+    - key: fluid_cp_J_per_kgK
+      type: number
+      required: true
+      range:
+        min: 3500
+        max: 4500
+
+    - key: fluid_density_kg_m3
+      type: number
+      required: false
+      range:
+        min: 900
+        max: 1050
+
+    - key: pipe_model
+      type: text
+      required: true
+
+    - key: ground_temperature_C
+      type: number
+      required: false
+      range:
+        min: -20
+        max: 40
+
+    - key: comments
+      type: text
+      required: false

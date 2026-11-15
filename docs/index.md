@@ -4,7 +4,7 @@ Tools and, in time, a web app for the **District Energy Simulation Test Procedur
 (DESTEST)**: common modelling exercises (CMEs) in which several simulation tools model
 the same district energy system so their results can be compared.
 
-The first building block is the `destest.naming` package, which checks that submitted
+The first building block is the `destest.filename_check` package, which checks that submitted
 result files follow the [naming convention](naming-convention.md):
 
 ```console

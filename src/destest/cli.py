@@ -3,12 +3,15 @@
     destest check-names "Result data" --recursive       check every file in a folder tree
     destest check-names file1.csv file2.csv             check given files (or bare names)
     destest check-names "Result data" -r --csv report.csv
-    destest make-name --series DHN --number 1 --data-type ResultData --tool TRNSYS \
-        --tool-version 2022 --institution TUD --first-name Clemens --last-name Felsmann
+    destest make-name --data-type ResultData --series DHN --exercise-number 1 \
+        --tool TRNSYS --tool-version 2022 --institution TUD \
+        --first-name Clemens --last-name Felsmann
+    destest specs                                       check the spec files, list the CMEs
     destest convention                                  print the naming rules
 
 Exit codes: 0 = all names valid, 1 = at least one invalid name, 2 = usage problem.
-New commands are added as another sub-parser in `build_parser()`.
+New commands are added as another sub-parser in `build_parser()`. The options of
+`make-name` are generated from the fields of `specs/naming_convention.yaml`.
 """
 
 import argparse
@@ -18,7 +21,7 @@ from datetime import datetime
 from pathlib import Path
 
 from . import __version__
-from .naming import (
+from .filename_check import (
     NameCheck,
     check_files,
     check_folder,
@@ -28,7 +31,14 @@ from .naming import (
     print_report,
     write_csv,
 )
-from .naming.convention import DATA_TYPES, SERIES
+from .filename_check import convention as conv
+from .specs import (
+    SpecError,
+    cme_spec_path,
+    list_cme_specs,
+    load_cme_spec_file,
+    naming_convention_path,
+)
 
 
 def _cmd_check_names(args: argparse.Namespace) -> int:
@@ -51,26 +61,21 @@ def _cmd_check_names(args: argparse.Namespace) -> int:
 
 
 def _cmd_make_name(args: argparse.Namespace) -> int:
-    created = None
-    if args.created:
-        try:
-            created = datetime.fromisoformat(args.created)
-        except ValueError:
-            print(f"--created: use YYYY-MM-DD HH:MM:SS (got '{args.created}')", file=sys.stderr)
-            return 2
+    parts: dict[str, object] = {}
+    for f in conv.FIELDS:
+        if f.kind == "literal":
+            continue
+        value = getattr(args, f.key)
+        if f.kind == "timestamp" and value is not None:
+            try:
+                value = datetime.fromisoformat(value)
+            except ValueError:
+                flag = "--" + f.key.replace("_", "-")
+                print(f"{flag}: use YYYY-MM-DD HH:MM:SS (got '{value}')", file=sys.stderr)
+                return 2
+        parts[f.key] = value
     try:
-        name = make_filename(
-            series=args.series,
-            number=args.number,
-            data_type=args.data_type,
-            tool=args.tool,
-            tool_version=args.tool_version,
-            institution=args.institution,
-            first_name=args.first_name,
-            last_name=args.last_name,
-            created=created,
-            extension=args.ext,
-        )
+        name = make_filename(extension=args.ext, **parts)
     except ValueError as exc:
         print(exc, file=sys.stderr)
         return 1
@@ -81,6 +86,23 @@ def _cmd_make_name(args: argparse.Namespace) -> int:
 def _cmd_convention(args: argparse.Namespace) -> int:
     print(describe())
     return 0
+
+
+def _cmd_specs(args: argparse.Namespace) -> int:
+    print(f"Naming convention: {naming_convention_path()}  OK")
+    ok = True
+    for name in list_cme_specs():
+        _, series, number = name.split("_")
+        path = cme_spec_path(series, int(number))
+        try:
+            spec = load_cme_spec_file(path)
+        except SpecError as exc:
+            ok = False
+            print(f"{name}: FAILED\n{exc}")
+            continue
+        n_cols = len(spec.result_data.columns)
+        print(f"{name}: OK  ({spec.cme.title}; {n_cols} columns; status {spec.cme.status})")
+    return 0 if ok else 1
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -99,20 +121,26 @@ def build_parser() -> argparse.ArgumentParser:
     c.set_defaults(func=_cmd_check_names)
 
     m = sub.add_parser("make-name", help="build a correct result-file name")
-    m.add_argument("--series", required=True, choices=list(SERIES))
-    m.add_argument("--number", required=True, type=int)
-    m.add_argument("--data-type", required=True, choices=list(DATA_TYPES))
-    m.add_argument("--tool", required=True)
-    m.add_argument("--tool-version", required=True)
-    m.add_argument("--institution", required=True)
-    m.add_argument("--first-name", required=True)
-    m.add_argument("--last-name", required=True)
-    m.add_argument("--created", help="YYYY-MM-DD HH:MM:SS (default: now)")
-    m.add_argument("--ext", default=".csv", help="file extension (default .csv)")
+    for f in conv.FIELDS:  # one option per part of the name
+        if f.kind == "literal":
+            continue
+        flag = "--" + f.key.replace("_", "-")
+        if f.kind == "timestamp":
+            m.add_argument(flag, dest=f.key, help="YYYY-MM-DD HH:MM:SS (default: now)")
+        elif f.kind == "choice":
+            m.add_argument(flag, dest=f.key, required=True, choices=list(f.allowed), help=f.label)
+        elif f.kind == "integer":
+            m.add_argument(flag, dest=f.key, required=True, type=int, help=f.label)
+        else:
+            m.add_argument(flag, dest=f.key, required=True, help=f.label)
+    m.add_argument("--ext", help="file extension (default: the one for the data type)")
     m.set_defaults(func=_cmd_make_name)
 
     v = sub.add_parser("convention", help="print the naming convention")
     v.set_defaults(func=_cmd_convention)
+
+    s = sub.add_parser("specs", help="check the spec files and list the CMEs")
+    s.set_defaults(func=_cmd_specs)
     return p
 
 
@@ -125,7 +153,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     try:
         result: int = args.func(args)
-    except (FileNotFoundError, NotADirectoryError) as exc:
+    except (FileNotFoundError, NotADirectoryError, SpecError) as exc:
         print(exc, file=sys.stderr)
         return 2
     return result

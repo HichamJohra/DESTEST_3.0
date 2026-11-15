@@ -18,10 +18,10 @@ SAVE_CSV = False
 CSV_REPORT = REPO_ROOT / "output" / "result_name_check.csv"
 
 try:
-    from destest.naming import check_folder, print_report, write_csv
+    from destest.filename_check import check_folder, print_report, write_csv
 except ImportError:  # package not installed yet (`uv sync`): use the source folder
     sys.path.insert(0, str(REPO_ROOT / "src"))
-    from destest.naming import check_folder, print_report, write_csv
+    from destest.filename_check import check_folder, print_report, write_csv
 
 
 def main() -> int:

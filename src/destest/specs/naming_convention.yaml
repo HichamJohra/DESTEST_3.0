@@ -1,0 +1,120 @@
+# =============================================================================
+# DESTEST 3.0 - Result-file naming convention
+# =============================================================================
+# Shared by ALL common modelling exercises (CMEs). Read by destest.filename_check.
+# Edit here to change the convention; the checker, `destest make-name` and the
+# printed template all follow this file. Checked on load: a typo or an unknown key
+# gives an error message naming the line's key.
+#
+# Template (built from `fields` below):
+#   <DataType>_DESTEST_CME_<Series>_<Number>_<ModellingTool>_<ToolVersion>_<Institution>_<FirstName>_<LastName>_<YYYY>_<MM>_<DD>_<hh>_<mm>_<ss>.<ext>
+# Example:
+#   ResultData_DESTEST_CME_DHN_1_TRNSYS_2022_TUD_Clemens_Felsmann_2022_01_01_12_00_00.csv
+#   ResultMetadata_DESTEST_CME_DHN_1_TRNSYS_2022_TUD_Clemens_Felsmann_2022_01_01_12_00_00.yaml
+# =============================================================================
+
+schema_version: 1          # version of THIS file's layout; bump it if the layout changes
+
+separator: "_"             # separates the parts of a name; not allowed inside a part
+
+# --- Lists of allowed values ---------------------------------------------------
+data_types:                # always the first part of the name
+  ResultData:
+    description: Simulation results (time series)
+    extensions:
+      - ".csv"
+  ResultMetadata:
+    description: Description of the model, tool settings and modeller
+    extensions:
+      - ".yaml"
+
+series:                    # common modelling exercise series
+  DHN: District Heating Network
+  DCN: District Cooling Network
+  DEL: Distribution Electrical Grid
+
+# --- The parts of the name, in order -----------------------------------------------
+# kind:
+#   choice     must be one of the values in the list named by `from`
+#   literal    fixed text, written exactly as `value` (may span several parts)
+#   integer    whole number, >= `min`
+#   text       free text, not empty, no separator
+#   timestamp  valid date and time, written with `format` (Python strftime codes)
+fields:
+  - key: data_type
+    label: Data type
+    kind: choice
+    from: data_types
+    placeholder: <DataType>
+
+  - key: marker
+    label: DESTEST CME marker
+    kind: literal
+    value: DESTEST_CME     # mandatory, right after the data type
+
+  - key: series
+    label: Exercise series
+    kind: choice
+    from: series
+    placeholder: <Series>
+
+  - key: exercise_number
+    label: Exercise number in the series
+    kind: integer
+    min: 0
+    placeholder: <Number>
+
+  - key: tool
+    label: Modelling tool
+    kind: text
+    placeholder: <ModellingTool>
+    warn_if_no_letter: true
+
+  - key: tool_version
+    label: Modelling tool version
+    kind: text
+    placeholder: <ToolVersion>
+    warn_if_no_digit: true
+
+  - key: institution
+    label: Institution of the modeller
+    kind: text
+    placeholder: <Institution>
+
+  - key: first_name
+    label: First name of the modeller
+    kind: text
+    placeholder: <FirstName>
+
+  - key: last_name
+    label: Last name of the modeller
+    kind: text
+    placeholder: <LastName>
+
+  - key: creation_date_time
+    label: Date and time the data file was created
+    kind: timestamp
+    format: "%Y_%m_%d_%H_%M_%S"
+    placeholder: <YYYY>_<MM>_<DD>_<hh>_<mm>_<ss>
+    warn_if_future_hours: 24   # warn if later than now + 24 h
+
+# --- Rules for free-text parts ---------------------------------------------------------
+text_rules:
+  forbidden_characters: '<>:"/\|?*'   # not allowed in Windows file names
+  warn_on_spaces: true                # prefer "-" or CamelCase, e.g. Modelica-Buildings
+
+# --- Folder ----------------------------------------------------------------------------
+folder:
+  pattern: "CME_{series}_{exercise_number}"    # files live in "Result data/CME_<Series>_<Number>/"
+  must_match_name: true
+
+# --- Pairing of data and metadata files ----------------------------------------------------
+pairing:
+  # Every ResultData file needs a ResultMetadata file in the same folder whose name is
+  # identical except for the data type and the extension.
+  # A metadata file without its data file always gives a warning.
+  required: true
+  severity: warning          # TEMPORARY: set to error once the metadata files are submitted
+  pairs:
+    - data: ResultData
+      metadata: ResultMetadata
