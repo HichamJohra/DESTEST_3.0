@@ -114,7 +114,7 @@ pairing:
   # identical except for the data type and the extension.
   # A metadata file without its data file always gives a warning.
   required: true
-  severity: warning          # TEMPORARY: set to error once the metadata files are submitted
+  severity: error            # a data file without its metadata file is rejected
   pairs:
     - data: ResultData
       metadata: ResultMetadata

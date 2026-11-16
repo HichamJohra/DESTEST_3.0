@@ -1,0 +1,124 @@
+# =============================================================================
+# DESTEST 3.0 - Layout of the ResultMetadata files
+# =============================================================================
+# Shared by ALL common modelling exercises (CMEs). Read by destest.
+# Lists the sections of a ResultMetadata file, in order, and the fields of the
+# sections that are the same in every CME. The fields of `simulation_config`
+# and `model_details` are defined in each CME's file (cme/CME_<Series>_<Number>.yaml).
+#
+# Rules for a ResultMetadata file:
+#   - every key listed here (or in the CME file) must be present: missing -> error
+#   - no other key is allowed: unknown -> error
+#   - all values are free text; "required" values must not be empty
+#
+# Section kinds:
+#   fields    a group of keys, listed under `fields`
+#   per_cme   a group of keys, listed in the CME file under result_metadata.<name>
+#   text      one free-text value (may span several lines)
+#
+# Field settings:
+#   key          the key in the ResultMetadata file
+#   required     true: must be filled in; false: may be left empty ("")
+#   description  shown in the template, to tell the modeller what to write
+#   must_match   the value must agree with: a part of the file name (its key in
+#                naming_convention.yaml), "cme" (the folder, e.g. CME_DHN_1) or
+#                "result_data_file" (the name of the paired ResultData file)
+# =============================================================================
+
+schema_version: 1
+
+format_version: 1                   # value expected in `metadata_format_version`
+
+sections:
+  - name: submission_info
+    kind: fields
+    fields:
+      - key: cme
+        required: true
+        description: The CME, e.g. CME_DHN_1; must match the folder and the file name
+        must_match: cme
+
+      - key: result_data_file
+        required: true
+        description: Name of the ResultData file this file describes
+        must_match: result_data_file
+
+      - key: creation_date_time
+        required: true
+        description: Date and time the ResultData file was created, as in its name (YYYY-MM-DD hh:mm:ss)
+        must_match: creation_date_time
+
+  - name: modeller
+    kind: fields
+    fields:
+      - key: first_name
+        required: true
+        description: Same as in the file name
+        must_match: first_name
+
+      - key: last_name
+        required: true
+        description: Same as in the file name
+        must_match: last_name
+
+      - key: institution
+        required: true
+        description: Short form, same as in the file name
+        must_match: institution
+
+      - key: institution_full_name
+        required: true
+        description: e.g. Technische Universitaet Dresden
+
+      - key: institution_city
+        required: true
+        description: e.g. Dresden (for the map of contributions)
+
+      - key: institution_country
+        required: true
+        description: e.g. Germany
+
+      - key: orcid
+        required: false
+        description: e.g. 0000-0002-1825-0097
+
+  - name: modelling_tool
+    kind: fields
+    fields:
+      - key: name
+        required: true
+        description: Same as in the file name
+        must_match: tool
+
+      - key: version
+        required: true
+        description: Same as in the file name (write it in quotes, e.g. "18.4")
+        must_match: tool_version
+
+      - key: licence
+        required: true
+        description: e.g. commercial, open-source (MIT), in-house
+
+      - key: url
+        required: false
+        description: Website of the tool
+
+      - key: libraries
+        required: false
+        description: Libraries / packages used, with versions, e.g. Modelica Buildings 11.0.0
+
+  - name: simulation_config
+    kind: per_cme
+
+  - name: model_details
+    kind: per_cme
+
+  - name: deviations
+    kind: text
+    required: true
+    description: Every way this result departs from the CME description; "none" if there is none
+
+  - name: other_comments
+    kind: text
+    required: false
+    description: Anything else the organisers should know

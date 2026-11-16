@@ -5,6 +5,7 @@ value or a wrong type stops with a message that names the place in the file
 (see `destest.specs.SpecError`). Two files are described here:
 
 - `naming_convention.yaml` -> `NamingConvention` (one file for all CMEs)
+- `result_metadata.yaml` -> `ResultMetadataLayout` (one file for all CMEs)
 - `cme/CME_<Series>_<Number>.yaml` -> `CmeSpec` (one file per CME)
 
 To add a new setting to a YAML file, add it to the matching model first;
@@ -16,6 +17,8 @@ import string
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from .expressions import parse_rule
 
 Severity = Literal["error", "warning"]
 
@@ -195,7 +198,8 @@ class CmeInfo(_Strict):
 
     series: str
     exercise_number: int = Field(ge=0)
-    title: str
+    full_title: str = Field(min_length=1)
+    description_reference: str = ""  # where the CME is described (report, section)
     status: Literal["draft", "active", "closed"] = "draft"
 
 
@@ -304,48 +308,91 @@ class ResultDataSpec(_Strict):
             doubles = sorted({v for v in values if values.count(v) > 1})
             if doubles:
                 raise ValueError(f"columns: {what} used more than once: {', '.join(doubles)}")
-        if self.time and self.time.column not in {c.key for c in self.columns}:
+        keys = {c.key for c in self.columns}
+        if self.time and self.time.column not in keys:
             raise ValueError(f"time.column: '{self.time.column}' is not a column key")
+        for i, c in enumerate(self.consistency):
+            where = f"consistency[{i}] ({c.name})"
+            try:
+                rule = parse_rule(c.expression)
+            except ValueError as exc:
+                raise ValueError(f"{where}: {exc}") from exc
+            unknown = sorted(rule.names - keys)
+            if unknown:
+                raise ValueError(f"{where}: not a column key: {', '.join(unknown)}")
+            if rule.op == "≈" and c.tolerance_relative is None:
+                raise ValueError(f"{where}: a rule with '≈' needs tolerance_relative")
         return self
-
-
-class MetadataFormat(_Strict):
-    """How the metadata file is written."""
-
-    extension: str = ".yaml"
 
 
 class MetadataField(_Strict):
-    """One key the modeller fills in in the metadata file."""
+    """One key the modeller fills in in the ResultMetadata file (free text)."""
 
     key: str = Field(pattern=_KEY)
-    type: Literal["text", "integer", "number", "date", "datetime", "choice", "list"]
     required: bool = False
-    matches_name_part: str | None = None  # must agree with this part of the file name
-    range: Range | None = None
-    choices: list[str] | None = None
-    example: str | None = None
+    description: str = ""
+    # The value must agree with a part of the file name (its key in
+    # naming_convention.yaml), with "cme" (the folder) or "result_data_file".
+    must_match: str | None = None
 
-    @model_validator(mode="after")
-    def _choices(self) -> "MetadataField":
-        if (self.type == "choice") != (self.choices is not None):
-            raise ValueError(f"{self.key}: 'choices' is needed for, and only for, type 'choice'")
-        return self
+
+def _unique_keys(fields: list[MetadataField], where: str) -> None:
+    keys = [f.key for f in fields]
+    doubles = sorted({k for k in keys if keys.count(k) > 1})
+    if doubles:
+        raise ValueError(f"{where}: key used more than once: {', '.join(doubles)}")
 
 
 class ResultMetadataSpec(_Strict):
-    """Rules for the ResultMetadata (.yaml) file."""
+    """The ResultMetadata sections defined per CME (in the CME file)."""
 
-    file: MetadataFormat = MetadataFormat()
-    unknown_keys: Literal["error", "warning", "ignore"] = "warning"
-    fields: list[MetadataField] = Field(min_length=1)
+    simulation_config: list[MetadataField] = Field(min_length=1)
+    model_details: list[MetadataField] = Field(min_length=1)
 
     @model_validator(mode="after")
     def _unique(self) -> "ResultMetadataSpec":
-        keys = [f.key for f in self.fields]
-        doubles = sorted({k for k in keys if keys.count(k) > 1})
+        _unique_keys(self.simulation_config, "simulation_config")
+        _unique_keys(self.model_details, "model_details")
+        return self
+
+
+class MetadataSection(_Strict):
+    """One section of a ResultMetadata file (in `result_metadata.yaml`)."""
+
+    name: str = Field(pattern=_KEY)
+    kind: Literal["fields", "per_cme", "text"]
+    fields: list[MetadataField] = Field(default_factory=list)  # kind "fields"
+    required: bool = False  # kind "text"
+    description: str = ""  # kind "text"
+
+    @model_validator(mode="after")
+    def _fits_kind(self) -> "MetadataSection":
+        if (self.kind == "fields") != bool(self.fields):
+            raise ValueError(f"{self.name}: 'fields' is needed for, and only for, kind 'fields'")
+        _unique_keys(self.fields, self.name)
+        return self
+
+
+class ResultMetadataLayout(_Strict):
+    """Contents of `result_metadata.yaml`: the sections of every ResultMetadata file."""
+
+    schema_version: Literal[1]
+    format_version: int = Field(ge=1)  # expected value of `metadata_format_version`
+    sections: list[MetadataSection] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _consistent(self) -> "ResultMetadataLayout":
+        names = [s.name for s in self.sections]
+        doubles = sorted({n for n in names if names.count(n) > 1})
         if doubles:
-            raise ValueError(f"fields: key used more than once: {', '.join(doubles)}")
+            raise ValueError(f"sections: name used more than once: {', '.join(doubles)}")
+        per_cme = sorted(s.name for s in self.sections if s.kind == "per_cme")
+        expected = sorted(ResultMetadataSpec.model_fields)
+        if per_cme != expected:
+            raise ValueError(
+                f"sections: the 'per_cme' sections must be {', '.join(expected)} "
+                f"(found {', '.join(per_cme) or 'none'})"
+            )
         return self
 
 

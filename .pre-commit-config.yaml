@@ -38,8 +38,9 @@ repos:
         types: [python]
         pass_filenames: false
 
-      - id: check-result-names
-        name: result file names follow the DESTEST convention
-        entry: uv run --frozen destest check-names --errors-only
+      - id: check-result-files
+        name: result files pass destest check (names, pairing, content)
+        entry: uv run --frozen destest check "Result data" --errors-only
         language: system
-        files: ^Result data/
+        files: ^(Result data/|src/destest/specs/)
+        pass_filenames: false

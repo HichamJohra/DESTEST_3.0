@@ -5,8 +5,10 @@ Web App for the District Energy Simulation Test Procedure
 [![Docs](https://github.com/HichamJohra/DESTEST_3.0/actions/workflows/docs.yml/badge.svg)](https://hichamjohra.github.io/DESTEST_3.0/)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
 
-The `destest` Python package holds the building blocks of the app. It currently
-checks that submitted result files follow the DESTEST naming convention:
+The `destest` Python package holds the building blocks of the app. It checks submitted
+result files: their names, the pairing of data and metadata files, the content of the
+ResultData (.csv) and ResultMetadata (.yaml) files. The rules are YAML spec files in
+`src/destest/specs/` (one per CME). File names follow the DESTEST naming convention:
 
 ```text
 <DataType>_DESTEST_CME_<Series>_<Number>_<ModellingTool>_<ToolVersion>_<Institution>_<FirstName>_<LastName>_<YYYY>_<MM>_<DD>_<hh>_<mm>_<ss>.<ext>
@@ -20,7 +22,7 @@ Requires [uv](https://docs.astral.sh/uv/getting-started/installation/).
 
 ```bash
 uv sync                                                # set up .venv with everything needed
-uv run destest check-names "Result data" --recursive   # check the result file names
+uv run destest check "Result data"                     # check names, pairing and content
 uv run pytest                                          # run the tests
 uv run pre-commit install                              # run the checks before each commit
 ```
@@ -28,7 +30,9 @@ uv run pre-commit install                              # run the checks before e
 ## Documentation
 
 - [Getting started](docs/getting-started.md)
+- [Checking submissions](docs/checking.md)
 - [Naming convention](docs/naming-convention.md)
+- [ResultMetadata files](docs/result-metadata.md)
 - [Project structure](docs/project-structure.md)
 - [Development](docs/development.md): uv, Ruff, mypy, pre-commit, CI, docs site
 

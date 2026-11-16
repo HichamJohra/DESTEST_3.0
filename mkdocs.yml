@@ -31,7 +31,9 @@ theme:
 nav:
   - Home: index.md
   - Getting started: getting-started.md
+  - Checking submissions: checking.md
   - Naming convention: naming-convention.md
+  - ResultMetadata files: result-metadata.md
   - Project structure: project-structure.md
   - Development: development.md
   - API reference: reference.md

@@ -14,8 +14,11 @@ schema_version: 1
 
 cme:
   series: DHN
-  exercise_number: 1           # CE 1 of the DHN series
-  title: District heating network in steady state
+  exercise_number: 1
+  full_title: Steady-state simulation of a district heating network
+  description_reference: >-
+    DESTEST case report (IBPSA Project 1, WP3), draft 16 Oct 2026,
+    section "Common exercise 0: Steady-state simulation of a district heating network" (Network_0)
   status: draft
 
 # =============================================================================
@@ -206,87 +209,69 @@ result_data:
 # =============================================================================
 # ResultMetadata file (.yaml)
 # =============================================================================
+# The sections and fields used in every CME (submission_info, modeller,
+# modelling_tool, deviations, other_comments) are defined once, in
+# specs/result_metadata.yaml. Here: the fields of the two sections that are
+# defined per CME. Each field becomes one key in the ResultMetadata file.
+#   key          the key in the ResultMetadata file
+#   required     true: must be filled in; false: may be left empty ("")
+#   description  shown in the template, to tell the modeller what to write
 result_metadata:
 
-  file:
-    extension: .yaml
-
-  unknown_keys: warning        # keys not listed below
-
-  # Keys the modeller fills in. type: text | integer | number | date | datetime | choice | list
-  fields:
-    # --- Must agree with the file name (checked against it) ---
-    - key: modelling_tool
-      type: text
-      required: true
-      matches_name_part: tool
-
-    - key: tool_version
-      type: text
-      required: true
-      matches_name_part: tool_version
-
-    - key: institution
-      type: text
-      required: true
-      matches_name_part: institution
-
-    - key: first_name
-      type: text
-      required: true
-      matches_name_part: first_name
-
-    - key: last_name
-      type: text
-      required: true
-      matches_name_part: last_name
-
-    - key: creation_date_time
-      type: datetime
-      required: true
-      matches_name_part: creation_date_time
-
-    # --- About the model and the simulation (proposals, TO BE AGREED) ---
-    - key: library
-      type: text
-      required: false
-      example: "Modelica Buildings 11.0.0"
-
+  simulation_config:
     - key: solver
-      type: text
       required: false
+      description: Solver / numerical method, e.g. DASSL, Euler, Newton-Raphson
 
     - key: time_step_s
-      type: number
       required: true
-      range:
-        min: 0
+      description: Simulation time step [s]; "variable" if adaptive
 
-    - key: fluid_cp_J_per_kgK
-      type: number
-      required: true
-      range:
-        min: 3500
-        max: 4500
-
-    - key: fluid_density_kg_m3
-      type: number
+    - key: tolerance
       required: false
-      range:
-        min: 900
-        max: 1050
+      description: Solver tolerance, e.g. 1e-6
 
+    - key: computation_time_s
+      required: false
+      description: Wall-clock time of the run [s]
+
+    - key: computer_configuration
+      required: false
+      description: Computer used, e.g. Intel i7-1365U, 32 GB RAM, Windows 11
+
+  # Modelling choices made for THIS result that the CME description leaves open.
+  # Fixed by the description (not asked): fluid properties (water at 50 C,
+  # constant), 10 C at the outer insulation surface, wall friction only, ideal
+  # substations, 70 C supply.
+  model_details:
     - key: pipe_model
-      type: text
-      required: true
-
-    - key: ground_temperature_C
-      type: number
       required: false
-      range:
-        min: -20
-        max: 40
+      description: e.g. plug-flow pipe, finite-volume pipe, steady-state pipe
 
-    - key: comments
-      type: text
+    - key: pipe_discretisation
       required: false
+      description: e.g. 10 volumes per pipe; "none" for plug-flow
+
+    - key: pipe_wall_thermal_capacity
+      required: false
+      description: Included or neglected
+
+    - key: friction_factor_correlation
+      required: false
+      description: e.g. Colebrook-White, Swamee-Jain, Haaland
+
+    - key: heat_loss_calculation
+      required: false
+      description: How the heat loss through pipe wall and insulation is computed
+
+    - key: fluid_properties_used
+      required: false
+      description: e.g. constant, as in the description; or what was used instead
+
+    - key: substation_model
+      required: false
+      description: e.g. ideal pump with prescribed mass flow, valve + ideal heat extractor
+
+    - key: steady_state_approach
+      required: false
+      description: How steady state was reached and checked (duration, initial values)

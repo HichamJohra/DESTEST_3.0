@@ -16,18 +16,32 @@ DESTEST_3.0/
 │       ├── py.typed          tells type checkers the package has type hints
 │       ├── specs/            the rules, as YAML files (edit these, not the code)
 │       │   ├── naming_convention.yaml   file-name rules, shared by all CMEs
+│       │   ├── result_metadata.yaml     sections of a ResultMetadata file, shared by all CMEs
 │       │   ├── cme/CME_DHN_1.yaml       content rules, one file per CME
 │       │   ├── schema.py                the allowed layout of those files (pydantic)
+│       │   ├── expressions.py           the safe mini-language of the consistency rules
 │       │   └── __init__.py              load_naming_convention(), load_cme_spec()
+│       ├── check.py          `destest check`: names, pairing and content in one go
+│       ├── result.py         shared result types: Issue, CheckResult (base of every check)
+│       ├── submission.py     create the two files of a new submission
+│       ├── data_check/       check the content of ResultData (.csv) files
+│       │   ├── validate.py     header, rows, values, time, ranges, consistency rules
+│       │   └── template.py     empty ResultData file: the header row of a CME
+│       ├── metadata_check/   check ResultMetadata files, write templates
+│       │   ├── validate.py     check one file or a folder against the specs
+│       │   └── template.py     write a (pre-filled) template from the specs
 │       └── filename_check/   check and build result-file names (naming convention)
 │           ├── convention.py   reads specs/naming_convention.yaml for the checker
 │           ├── validate.py     check a name, a list of files or a folder
 │           ├── build.py        build a correct name
 │           └── report.py       text report and CSV export
 ├── scripts/                  ready-to-run tasks (click Run in PyCharm)
-│   └── check_result_names.py
+│   ├── check_results.py      full check of "Result data" (one click in PyCharm)
+│   └── new_submission.py     create a new, correctly named file pair (fill in the values first)
 ├── tests/                    automatic tests
+│   ├── test_data_check.py
 │   ├── test_filename_check.py
+│   ├── test_metadata_check.py
 │   └── test_specs.py
 ├── docs/                     this documentation (Markdown)
 └── .github/

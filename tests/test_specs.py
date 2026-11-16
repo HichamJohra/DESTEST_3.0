@@ -16,7 +16,10 @@ from destest.specs import (
     load_cme_spec_file,
     load_naming_convention,
     load_naming_convention_file,
+    load_result_metadata_layout,
+    load_result_metadata_layout_file,
     naming_convention_path,
+    result_metadata_layout_path,
 )
 
 RESULT_DATA = Path(__file__).resolve().parents[1] / "Result data"
@@ -59,6 +62,23 @@ def test_cme_dhn_1_content() -> None:
     assert spec.result_data.time is not None
     assert spec.result_data.time.column == "time"
     assert spec.result_data.rows.max == 10
+    assert spec.cme.full_title == "Steady-state simulation of a district heating network"
+    assert spec.result_metadata.model_details[0].key == "pipe_model"
+
+
+def test_result_metadata_layout_loads() -> None:
+    layout = load_result_metadata_layout()
+    assert [s.name for s in layout.sections] == [
+        "submission_info",
+        "modeller",
+        "modelling_tool",
+        "simulation_config",
+        "model_details",
+        "deviations",
+        "other_comments",
+    ]
+    modeller = next(s for s in layout.sections if s.name == "modeller")
+    assert "institution_city" in [f.key for f in modeller.fields]
 
 
 def _result_files() -> list[Path]:
@@ -146,11 +166,19 @@ def test_missing_file(tmp_path: Path) -> None:
         (lambda d: d["result_data"]["time"].update(column="t"), "not a column key"),
         (lambda d: d["result_data"]["rows"].update(min=20), "min <= expected <= max"),
         (lambda d: d["result_data"]["columns"][1]["range"].update(max=-1), "larger than max"),
-        (lambda d: d["result_metadata"]["fields"][0].update(type="txt"), r"fields\[0\]\.type"),
         (
-            lambda d: d["result_metadata"]["fields"][0].update(matches_name_part="tol"),
+            lambda d: d["result_metadata"]["model_details"][0].update(requird=True),
+            r"result_metadata\.model_details\[0\]\.requird",
+        ),
+        (
+            lambda d: d["result_metadata"]["simulation_config"].append({"key": "solver"}),
+            "used more than once: solver",
+        ),
+        (
+            lambda d: d["result_metadata"]["model_details"][0].update(must_match="tol"),
             "'tol' is not a field of the naming convention",
         ),
+        (lambda d: d["cme"].pop("full_title"), r"cme\.full_title: Field required"),
     ],
 )
 def test_cme_rules_are_checked(tmp_path: Path, change: Any, expected: str) -> None:
@@ -160,8 +188,32 @@ def test_cme_rules_are_checked(tmp_path: Path, change: Any, expected: str) -> No
         load_cme_spec_file(_write(tmp_path, "CME_DHN_1.yaml", data))
 
 
+def _layout() -> dict[str, Any]:
+    text = result_metadata_layout_path().read_text(encoding="utf-8")
+    data: dict[str, Any] = yaml.safe_load(text)
+    return data
+
+
+@pytest.mark.parametrize(
+    ("change", "expected"),
+    [
+        (lambda d: d["sections"][3].update(kind="fields"), "needed for, and only for"),
+        (lambda d: d["sections"].pop(4), "per_cme' sections must be"),
+        (lambda d: d["sections"].append(dict(d["sections"][0])), "name used more than once"),
+        (lambda d: d["sections"][1]["fields"][0].update(must_match="nme"), "'nme' is not a field"),
+        (lambda d: d["sections"][0].update(kind="list"), r"sections\[0\]\.kind"),
+    ],
+)
+def test_layout_rules_are_checked(tmp_path: Path, change: Any, expected: str) -> None:
+    data = _layout()
+    change(data)
+    with pytest.raises(SpecError, match=expected):
+        load_result_metadata_layout_file(_write(tmp_path, "m.yaml", data))
+
+
 # ---- command line ------------------------------------------------------------
 def test_cli_specs(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["specs"]) == 0
     out = capsys.readouterr().out
     assert "CME_DHN_1: OK" in out
+    assert "ResultMetadata layout:" in out

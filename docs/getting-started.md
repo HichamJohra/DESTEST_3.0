@@ -60,6 +60,10 @@ prints something like
 The options follow the parts defined in `specs/naming_convention.yaml`;
 `uv run destest make-name --help` lists them.
 
+To create the files themselves (an empty, header-only CSV and the pre-filled metadata
+file, both correctly named), use `destest new-submission` with the same options and
+`-o <folder>`; see [Checking submissions](checking.md).
+
 ## From Python
 
 ```python

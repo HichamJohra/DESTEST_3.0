@@ -51,8 +51,8 @@ The checker, `destest make-name`, `destest convention` and this table follow it;
 
 | Severity | What |
 |---|---|
-| Error | Data type not first, or not in the list; missing or misspelled `DESTEST_CME`; series not in the list or in the wrong place; number not a whole number; empty part; too many or too few parts; time stamp not a valid date/time or wrong digit count; no extension, or an extension not allowed for the data type; file in a folder for another exercise |
-| Warning | Leading zero in the number (`01`); spaces in a part; tool version without any digit (often a sign that a part is missing); tool name without any letter; time stamp in the future; data file without its metadata file (for now, see below); metadata file without its data file |
+| Error | Data type not first, or not in the list; missing or misspelled `DESTEST_CME`; series not in the list or in the wrong place; number not a whole number; empty part; too many or too few parts; time stamp not a valid date/time or wrong digit count; no extension, or an extension not allowed for the data type; file in a folder for another exercise; data file without its metadata file |
+| Warning | Leading zero in the number (`01`); spaces in a part; tool version without any digit (often a sign that a part is missing); tool name without any letter; time stamp in the future; metadata file without its data file |
 
 A file passes when it has no errors. Warnings are shown but do not fail the check.
 
@@ -73,7 +73,6 @@ the file. Run `uv run destest specs` to check it, then `uv run pytest`.
 
 When files are checked on disk (`destest check-names`), every `ResultData` file must
 have its `ResultMetadata` file in the same folder: the same name with the other data
-type and `.yaml`. A missing metadata file is reported at the level set by
-`pairing.severity` in the YAML file. It is **`warning` for now**, because no metadata
-file has been submitted yet; set it to `error` once they are in. A metadata file
-without its data file always gives a warning.
+type and `.yaml`. A missing metadata file is an **error** (level set by
+`pairing.severity` in the YAML file). A metadata file without its data file gives a
+warning.

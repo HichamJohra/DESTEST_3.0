@@ -50,3 +50,46 @@ Generated from the docstrings in `src/destest`.
       members:
         - NamingConvention
         - CmeSpec
+
+## ResultMetadata files
+
+::: destest.metadata_check.validate
+    options:
+      members:
+        - check_metadata
+        - check_metadata_folder
+        - MetadataCheck
+
+::: destest.metadata_check.template
+
+## ResultData files
+
+::: destest.data_check.validate
+    options:
+      members:
+        - check_data
+        - check_data_folder
+        - check_data_text
+        - DataCheck
+
+::: destest.data_check.template
+
+## Everything at once
+
+::: destest.check
+
+## Consistency rules
+
+::: destest.specs.expressions
+    options:
+      members:
+        - parse_rule
+        - check_rule
+
+## Result types
+
+::: destest.result
+
+## New submission
+
+::: destest.submission

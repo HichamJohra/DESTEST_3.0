@@ -3,6 +3,7 @@
 ```text
 specs/
 ├── naming_convention.yaml     file-name rules, shared by all CMEs
+├── result_metadata.yaml       sections of a ResultMetadata file, shared by all CMEs
 └── cme/
     └── CME_DHN_1.yaml         content rules for one CME (one file per CME)
 ```
@@ -11,6 +12,7 @@ specs/
 from destest.specs import load_naming_convention, load_cme_spec, list_cme_specs
 
 conv = load_naming_convention()          # -> NamingConvention
+layout = load_result_metadata_layout()   # -> ResultMetadataLayout
 spec = load_cme_spec("DHN", 1)           # -> CmeSpec
 list_cme_specs()                         # -> ["CME_DHN_1", ...]
 ```
@@ -28,11 +30,12 @@ from typing import Any, TypeVar
 import yaml
 from pydantic import BaseModel, ValidationError
 
-from .schema import CmeSpec, NamingConvention
+from .schema import CmeSpec, MetadataField, NamingConvention, ResultMetadataLayout
 
 __all__ = [
     "CmeSpec",
     "NamingConvention",
+    "ResultMetadataLayout",
     "SpecError",
     "cme_spec_path",
     "list_cme_specs",
@@ -40,7 +43,10 @@ __all__ = [
     "load_cme_spec_file",
     "load_naming_convention",
     "load_naming_convention_file",
+    "load_result_metadata_layout",
+    "load_result_metadata_layout_file",
     "naming_convention_path",
+    "result_metadata_layout_path",
 ]
 
 _Model = TypeVar("_Model", bound=BaseModel)
@@ -57,6 +63,11 @@ def _spec_dir() -> Path:
 def naming_convention_path() -> Path:
     """Path of the packaged `naming_convention.yaml`."""
     return _spec_dir() / "naming_convention.yaml"
+
+
+def result_metadata_layout_path() -> Path:
+    """Path of the packaged `result_metadata.yaml`."""
+    return _spec_dir() / "result_metadata.yaml"
 
 
 def cme_spec_path(series: str, exercise_number: int) -> Path:
@@ -105,8 +116,38 @@ def load_naming_convention_file(path: Path) -> NamingConvention:
     return _parse(NamingConvention, _read_yaml(path), path)
 
 
+def _raise_if(problems: list[str], path: Path) -> None:
+    if problems:
+        head = f"{path.name}: {len(problems)} problem(s)"
+        raise SpecError("\n".join([head, *(f"  - {p}" for p in problems)]))
+
+
+def _bad_must_match(fields: list[MetadataField], where: str, conv: NamingConvention) -> list[str]:
+    """`must_match` values that are neither a naming field nor a special target."""
+    allowed = {f.key for f in conv.fields} | {"cme", "result_data_file"}
+    return [
+        f"{where}.{f.key}.must_match: '{f.must_match}' is not a field of the naming convention "
+        "nor 'cme' / 'result_data_file'"
+        for f in fields
+        if f.must_match is not None and f.must_match not in allowed
+    ]
+
+
+def load_result_metadata_layout_file(
+    path: Path, convention: NamingConvention | None = None
+) -> ResultMetadataLayout:
+    """Load and check a result-metadata layout file (any path)."""
+    layout = _parse(ResultMetadataLayout, _read_yaml(path), path)
+    conv = convention or load_naming_convention()
+    problems: list[str] = []
+    for s in layout.sections:
+        problems += _bad_must_match(s.fields, s.name, conv)
+    _raise_if(problems, path)
+    return layout
+
+
 def load_cme_spec_file(path: Path, convention: NamingConvention | None = None) -> CmeSpec:
-    """Load and check a CME spec file (any path), also against the naming convention."""
+    """Load and check a CME spec file (any path), also against the shared spec files."""
     spec = _parse(CmeSpec, _read_yaml(path), path)
     conv = convention or load_naming_convention()
     problems: list[str] = []
@@ -114,16 +155,10 @@ def load_cme_spec_file(path: Path, convention: NamingConvention | None = None) -
         problems.append(f"cme.series: '{spec.cme.series}' is not in the naming convention")
     if path.stem != spec.folder_name:
         problems.append(f"file name: should be {spec.folder_name}.yaml to match 'cme'")
-    name_keys = {f.key for f in conv.fields}
-    for f in spec.result_metadata.fields:
-        if f.matches_name_part and f.matches_name_part not in name_keys:
-            problems.append(
-                f"result_metadata.fields.{f.key}.matches_name_part: "
-                f"'{f.matches_name_part}' is not a field of the naming convention"
-            )
-    if problems:
-        head = f"{path.name}: {len(problems)} problem(s)"
-        raise SpecError("\n".join([head, *(f"  - {p}" for p in problems)]))
+    meta = spec.result_metadata
+    for name in ("simulation_config", "model_details"):
+        problems += _bad_must_match(getattr(meta, name), f"result_metadata.{name}", conv)
+    _raise_if(problems, path)
     return spec
 
 
@@ -131,6 +166,12 @@ def load_cme_spec_file(path: Path, convention: NamingConvention | None = None) -
 def load_naming_convention() -> NamingConvention:
     """The packaged naming convention (loaded once, then cached)."""
     return load_naming_convention_file(naming_convention_path())
+
+
+@cache
+def load_result_metadata_layout() -> ResultMetadataLayout:
+    """The packaged result-metadata layout (loaded once, then cached)."""
+    return load_result_metadata_layout_file(result_metadata_layout_path())
 
 
 @cache

@@ -11,7 +11,8 @@ Example:
     >>> result.values["series"], result.values["exercise_number"]
     ('DHN', 1)
 
-Every problem found is recorded as an `Issue` (level `error` or `warning`).
+Every problem found is recorded as an `Issue` (level `error` or `warning`,
+see `destest.result`).
 A name is valid when it has no errors; warnings point at things that are
 allowed but probably unintended (a leading zero, a date in the future, ...).
 """
@@ -25,6 +26,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from ..result import CheckResult
 from . import convention as conv
 from .convention import Field
 
@@ -42,50 +44,13 @@ _EXTENSION = re.compile(r"\.([A-Za-z][A-Za-z0-9]{0,9})$")
 # Result objects
 # --------------------------------------------------------------------------
 @dataclass
-class Issue:
-    """One problem found in a name."""
-
-    level: str  # "error" or "warning"
-    field: str  # Field.key, or "name" / "extension" / "folder"
-    message: str
-
-    def __str__(self) -> str:
-        return f"{self.level}: {self.message}"
-
-
-@dataclass
-class NameCheck:
-    """Outcome of checking one file name."""
+class NameCheck(CheckResult):
+    """Outcome of checking one file name (see `destest.result.CheckResult`)."""
 
     name: str
     path: Path | None = None
     extension: str = ""
     values: dict[str, Any] = field(default_factory=dict)
-    issues: list[Issue] = field(default_factory=list)
-
-    @property
-    def errors(self) -> list[Issue]:
-        """Problems that make the name invalid."""
-        return [i for i in self.issues if i.level == "error"]
-
-    @property
-    def warnings(self) -> list[Issue]:
-        """Things that are allowed but probably unintended."""
-        return [i for i in self.issues if i.level == "warning"]
-
-    @property
-    def ok(self) -> bool:
-        """True when the name follows the convention (warnings are allowed)."""
-        return not self.errors
-
-    @property
-    def status(self) -> str:
-        """`ok`, `warning` or `error`."""
-        return "error" if self.errors else ("warning" if self.warnings else "ok")
-
-    def add(self, level: str, key: str, message: str) -> None:
-        """Record an issue."""
-        self.issues.append(Issue(level, key, message))
 
 
 # --------------------------------------------------------------------------

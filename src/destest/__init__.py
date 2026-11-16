@@ -4,9 +4,13 @@ Sub-packages:
 
 - `destest.specs`: the rules, as YAML files (naming convention, one file per CME)
 - `destest.filename_check`: check and build result-file names
+- `destest.metadata_check`: check ResultMetadata files, write templates
+- `destest.data_check`: check the content of ResultData files
+- `destest.check`: everything at once (`destest check`)
 
 Command line:
 
+    destest check "Result data"
     destest check-names "Result data" --recursive
     python -m destest check-names "Result data" --recursive
 """

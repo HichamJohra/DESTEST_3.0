@@ -11,11 +11,11 @@ make_filename(series="DHN", exercise_number=1, ...)  # build a correct name
 The rules live in `src/destest/specs/naming_convention.yaml`.
 """
 
+from ..result import Issue
 from .build import make_filename
 from .convention import describe, template
 from .report import format_report, print_report, summary, write_csv
 from .validate import (
-    Issue,
     NameCheck,
     check_files,
     check_folder,
