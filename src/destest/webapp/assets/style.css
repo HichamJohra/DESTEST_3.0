@@ -1,0 +1,191 @@
+/* DESTEST web app - auto-loaded by Dash from the assets folder.
+   Part 1 is the style sheet of the NSBI Smart Building Mapping app (same look:
+   colours, font, navigation bar with logos, cards, KPIs, buttons, maps).
+   Part 2 adds what the DESTEST dashboards need (tables, badges, maps, footer). */
+
+/* =================== Part 1: NSBI Smart Building Mapping style =================== */
+/* Auto-loaded by Dash from the ./assets folder */
+:root {
+  --accent: #1f4e79;
+  --accent-2: #2e75b6;
+  --bg: #f3f5f9;
+  --card: #ffffff;
+  --text: #1a1a2e;
+  --muted: #5d6675;
+  --border: #dfe3ea;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+
+/* Navigation */
+.navbar { position: sticky; top: 0; z-index: 1000; display: flex; align-items: center; justify-content: space-between;
+          flex-wrap: wrap; gap: 8px; padding: 10px 24px; background: var(--accent); color: #fff;
+          box-shadow: 0 2px 6px rgba(0,0,0,.15); }
+.navbar .brand { font-weight: 600; font-size: 1.1rem; letter-spacing: .2px; }
+.navbar nav { display: flex; gap: 18px; flex-wrap: wrap; }
+.nav-link { color: #fff; text-decoration: none; opacity: .85; padding: 4px 2px; border-bottom: 2px solid transparent; }
+.nav-link:hover { opacity: 1; border-bottom-color: #fff; }
+.nav-right { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.nav-logos { display: flex; align-items: center; gap: 10px; padding-left: 20px; border-left: 1px solid rgba(255,255,255,.35); }
+.nav-logo { height: 40px; width: auto; display: block; border-radius: 4px; box-shadow: 0 0 0 1px rgba(255,255,255,.35); }
+@media (max-width: 700px) { .nav-logos { padding-left: 0; border-left: none; } .nav-logo { height: 30px; } }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 16px 24px 48px; }
+.page-head h1 { margin: 8px 0 4px; font-size: 1.7rem; }
+.page-head p { margin: 0 0 16px; color: var(--muted); }
+.building-title { margin: 8px 0 12px; }
+.status-line { margin: -4px 0 12px; cursor: help; }
+.status-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: .85rem; font-weight: 600; }
+.status-warn { background: #fdecea; color: #b3261e; }
+.status-ai { background: #fff4e0; color: #8a5300; }
+.status-ok { background: #e6f4ea; color: #1e6b34; }
+
+/* Cards and grids */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px;
+        margin-bottom: 18px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.card-title { margin: 0 0 4px; font-size: 1.15rem; color: var(--accent); }
+.card-subtitle { margin: 0 0 12px; color: var(--muted); font-size: .9rem; }
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 12px; }
+.grid-2 > .card { margin-bottom: 0; }
+.grid-2 + .grid-2, .grid-2 + .card, .card + .grid-2 { margin-top: 18px; }
+@media (max-width: 1000px) { .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid-2 { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .grid-4 { grid-template-columns: 1fr; } .container { padding: 12px 16px 32px; } }
+
+.control-label { display: block; font-size: .82rem; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+.range-block { padding: 4px 4px 22px; }
+.filter-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+.checklist label { margin-right: 14px; }
+
+/* KPIs */
+.kpi-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+@media (max-width: 800px) { .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.kpi { cursor: help; background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--accent-2);
+       border-radius: 10px; padding: 12px 16px; }
+.kpi-label { font-size: .8rem; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); }
+.kpi-value { font-size: 1.6rem; font-weight: 600; margin-top: 2px; }
+.kpi-sub { font-size: .85rem; color: var(--muted); }
+
+/* Buttons, inputs, misc */
+.btn { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 7px 14px; cursor: pointer; font-size: .9rem; }
+.btn:hover { background: var(--accent-2); }
+.muted { color: var(--muted); font-size: .9rem; }
+
+/* Dynamic filters */
+.filters-grid { align-items: start; margin-bottom: 8px; }
+/* Category and numeric rows share the same fixed height so dropdowns, sliders and the "+ Add" buttons
+   line up across the two columns. The dropdown sits at the top of the row; the slider track is centred
+   on the dropdown and its value tooltips use the space below. */
+.filter-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 34px; gap: 10px;
+              align-items: start; height: 64px; margin-bottom: 6px; }
+.filter-row .btn-icon { margin-top: 3px; }
+.filter-row .range-block { padding: 11px 6px 0; }
+.btn-light { background: transparent; color: var(--accent); border: 1px dashed var(--accent); border-radius: 6px;
+             padding: 5px 12px; cursor: pointer; font-size: .88rem; }
+.btn-light:hover { background: #eef3fa; }
+.btn-icon { width: 30px; height: 30px; border: 1px solid var(--border); background: #fff; color: var(--muted);
+            border-radius: 6px; cursor: pointer; font-size: .9rem; line-height: 1; }
+.btn-icon:hover { color: #c0392b; border-color: #c0392b; }
+
+/* Statistics cards below the map */
+.stat-row { margin-top: 14px; }
+.stat-card { border: 1px solid var(--border); border-left: 4px solid var(--accent-2); border-radius: 8px; padding: 10px 14px; }
+.stat-main { font-size: 1.5rem; font-weight: 600; }
+.stat-std { font-size: 1.1rem; color: var(--muted); }
+.stats { margin-top: 6px; font-family: Consolas, monospace; font-size: .88rem; color: var(--muted); }
+.selected-panel { margin-top: 6px; padding: 5px 10px; background: #eef3fa; border-radius: 6px; font-size: .8rem; }
+.link-strong { font-weight: 600; color: var(--accent); margin-left: 8px; }
+.table-toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+.search { flex: 1; max-width: 420px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: .95rem; }
+
+/* Tables */
+.info-table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+.info-table th, .info-table td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.info-table th { color: var(--muted); font-weight: 600; width: 34%; }
+.compare-table th { width: auto; }
+
+/* Hover descriptions: AG Grid header tooltips keep line breaks and wrap */
+.ag-tooltip { white-space: pre-line; max-width: 460px; line-height: 1.35; }
+.opt-label { display: inline-block; width: 100%; }
+
+/* About page: dataset variables */
+.var-group { margin: 10px 0 14px; }
+.var-group > summary { cursor: pointer; font-weight: 600; color: var(--accent); padding: 4px 0; }
+.var-group > p { margin: 4px 0 8px; }
+.vars-table th, .vars-table td { font-size: .86rem; }
+.vars-table th { width: auto; }
+.vars-table td:first-child { font-weight: 600; white-space: nowrap; }
+.vars-table td:nth-child(2), .vars-table td:nth-child(4) { white-space: nowrap; }
+.vars-table code { font-size: .8rem; color: var(--muted); }
+
+/* Contribute page */
+.sub-tabs { margin-bottom: 0; }
+.field-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 16px; margin: 8px 0 12px; }
+@media (max-width: 1000px) { .field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .field-grid { grid-template-columns: 1fr; } }
+.sub-field-wide { grid-column: 1 / -1; }
+.field-input { width: 100%; padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; font-size: .92rem; }
+.field-area { min-height: 70px; font-family: inherit; }
+.field-hint { font-size: .78rem; color: var(--muted); margin-top: 2px; }
+.req { color: #c0392b; }
+.consent { margin-top: 10px; font-size: .88rem; }
+.upload-box { border: 2px dashed var(--accent-2); border-radius: 10px; padding: 22px; text-align: center;
+              cursor: pointer; background: #f7faff; margin: 8px 0 12px; }
+.msg { margin-top: 12px; padding: 10px 14px; border-radius: 8px; font-size: .92rem; }
+.msg ul { margin: 6px 0 0; padding-left: 20px; }
+.msg-ok { background: #e8f5ec; border: 1px solid #9fd3ae; }
+.msg-error { background: #fdecec; border: 1px solid #f1a9a9; }
+.hp-field { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+
+/* About page: centred NSBI logo at the end of the app presentation */
+.about-logo { text-align: center; margin: 18px 0 4px; }
+.about-logo img { height: 110px; width: auto; }
+
+/* Building detail: info cards stacked on the left, location map filling the full height on the right */
+.bd-top { align-items: stretch; }
+.bd-col { display: flex; flex-direction: column; gap: 18px; }
+.bd-col > .card { margin-bottom: 0; }
+/* The map card stays in view (sticky) while scrolling the long info column, and the map fills the card */
+.map-card { display: flex; flex-direction: column; align-self: start; position: sticky; top: 76px;
+            height: calc(100vh - 100px); min-height: 360px; }
+@media (max-width: 1000px) { .map-card { position: static; height: 420px; } }
+.map-fill { position: relative; flex: 1 1 auto; min-height: 320px; }
+.map-fill > div { position: absolute; inset: 0; }
+
+/* =================== Part 2: DESTEST additions =================== */
+:root { --warn: #fff4d6; --bad: #ffd9d6; --good: #eef6ee; }
+.navbar .brand { color: #fff; text-decoration: none; }
+.footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 0 0 24px; }
+a.btn, a.btn-light { display: inline-block; text-decoration: none; }
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.badges { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 8px; }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: .82rem;
+         font-weight: 600; background: #e6eef8; color: var(--accent); }
+.badge-muted { background: #eef0f3; color: var(--muted); }
+.badge-warn { background: var(--warn); color: #8a5300; }
+.msg { margin: 0 0 16px; }
+.msg-info { background: #eef3fa; border: 1px solid #c7d7ee; }
+.msg-warn { background: var(--warn); border: 1px solid #f0d58a; }
+.pre { white-space: pre-wrap; font-size: .82rem; background: #f7f8fa; padding: 10px;
+       border-radius: 6px; overflow-x: auto; }
+code { font-size: .85rem; background: #f3f4f6; padding: 1px 4px; border-radius: 4px; }
+ol li { margin-bottom: 8px; }
+
+/* Dashboard tables (same cell classes as the static HTML pages). Narrow tables are
+   centred; full-width ones fill the card; wide ones scroll horizontally. */
+.table-scroll { overflow-x: auto; }
+.data-table { border-collapse: collapse; font-size: .85rem; margin: 0 auto; }
+.data-table.full-width { width: 100%; }
+.data-table th, .data-table td { border: 1px solid var(--border); padding: 5px 9px;
+                                 text-align: right; white-space: nowrap; vertical-align: top; }
+.data-table th { background: #f3f4f6; position: sticky; top: 0; font-weight: 600; }
+.data-table td:first-child, .data-table th:first-child { text-align: left; }
+.data-table td.ref { background: #f3f4f6; font-weight: 600; }
+.data-table td.warn { background: var(--warn); }
+.data-table td.bad { background: var(--bad); }
+.data-table td.score { font-weight: 600; background: var(--good); }
+.data-table td.wrap { white-space: normal; text-align: left; min-width: 220px; max-width: 520px; }
+.table-note { color: var(--muted); font-size: .82rem; margin: 6px 0 0; text-align: center; }
+
+/* Maps fill the card width */
+.card .js-plotly-plot, .card .dash-graph { width: 100%; }

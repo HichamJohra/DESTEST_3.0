@@ -275,3 +275,334 @@ result_metadata:
     - key: steady_state_approach
       required: false
       description: How steady state was reached and checked (duration, initial values)
+
+# =============================================================================
+# Analysis: KPIs and dashboards
+# =============================================================================
+# Building blocks (shared by all CMEs, see the docs page "Dashboards"):
+#   function  a KPI function from destest/analysis/kpis.py, e.g. steady_state, mean,
+#             integral; `params` passes its keyword parameters
+#   visual    a table or figure from destest/analysis/visuals.py, e.g. kpi_table,
+#             deviation_heatmap, kpi_bar, profile, time_series, carpet,
+#             metadata_table, data_check_table, closeness_bar, contributions_map;
+#             `options` are its keyword options
+# Checked on load: unknown functions, visuals, options or keys are errors.
+analysis:
+
+  reference: median            # reference = median (or mean) of all submissions
+
+  # The 18 results of Table 8 in the case report, as steady-state values
+  # (mean of the reported time steps; all are constant in a steady-state run).
+  kpis:
+    - key: m_flow_supply_i
+      label: Mass flow rate supply i
+      column: m_flow_supply_i
+      function: steady_state
+      unit: kg/h
+
+    - key: dp_supply_i_e
+      label: Pressure drop supply i-e
+      column: dp_supply_i_e
+      function: steady_state
+      unit: Pa
+
+    - key: dp_return_a_i
+      label: Pressure drop return a-i
+      column: dp_return_a_i
+      function: steady_state
+      unit: Pa
+
+    - key: dp_return_i_h
+      label: Pressure drop return i-h
+      column: dp_return_i_h
+      function: steady_state
+      unit: Pa
+
+    - key: T_supply_i
+      label: Supply temperature i
+      column: T_supply_i
+      function: steady_state
+      unit: degC
+
+    - key: T_supply_h
+      label: Supply temperature h
+      column: T_supply_h
+      function: steady_state
+      unit: degC
+
+    - key: T_supply_g
+      label: Supply temperature g
+      column: T_supply_g
+      function: steady_state
+      unit: degC
+
+    - key: T_supply_f
+      label: Supply temperature f
+      column: T_supply_f
+      function: steady_state
+      unit: degC
+
+    - key: T_supply_e
+      label: Supply temperature e
+      column: T_supply_e
+      function: steady_state
+      unit: degC
+
+    - key: T_supply_district
+      label: Supply temperature SimpleDistrict_1
+      column: T_supply_district
+      function: steady_state
+      unit: degC
+
+    - key: T_return_i
+      label: Return temperature i
+      column: T_return_i
+      function: steady_state
+      unit: degC
+
+    - key: T_return_h
+      label: Return temperature h
+      column: T_return_h
+      function: steady_state
+      unit: degC
+
+    - key: T_return_g
+      label: Return temperature g
+      column: T_return_g
+      function: steady_state
+      unit: degC
+
+    - key: T_return_f
+      label: Return temperature f
+      column: T_return_f
+      function: steady_state
+      unit: degC
+
+    - key: T_return_e
+      label: Return temperature e
+      column: T_return_e
+      function: steady_state
+      unit: degC
+
+    - key: T_return_district
+      label: Return temperature SimpleDistrict_1
+      column: T_return_district
+      function: steady_state
+      unit: degC
+
+    - key: Q_loss_supply_i_h
+      label: Heat loss supply i-h
+      column: Q_loss_supply_i_h
+      function: steady_state
+      unit: W
+
+    - key: Q_supplied
+      label: Total heat supplied
+      column: Q_supplied
+      function: steady_state
+      unit: W
+
+  dashboards:
+
+    # All submissions of the CME
+    overview:
+      - visual: data_check_table
+        title: Submissions
+        description: Creation date, result of `destest check` and closeness to the reference.
+
+      - visual: contributions_map
+        title: Where the contributions come from
+        description: Placed at the institution's city; the menu colours them by a metadata field.
+        options:
+          color_by:
+            - modelling_tool.name
+            - modeller.institution
+            - modeller.institution_country
+            - modelling_tool.licence
+            - model_details.pipe_model
+
+      - visual: kpi_table
+        title: Key performance indicators
+        description: Steady-state values; deviation from the reference in brackets.
+        options:
+          kpis: all
+          deviation: true
+
+      - visual: deviation_heatmap
+        title: Deviation from the reference [%]
+        options:
+          kpis: all
+          metric: relative_deviation
+
+      - visual: kpi_bar
+        title: Heat loss and heat supplied
+        options:
+          kpis:
+            - Q_loss_supply_i_h
+            - Q_supplied
+
+      - visual: kpi_bar
+        title: Pressure drops
+        description: Supply i-e and return a-i should be equal (symmetric network, constant fluid properties).
+        options:
+          kpis:
+            - dp_supply_i_e
+            - dp_return_a_i
+            - dp_return_i_h
+
+      - visual: profile
+        title: Supply temperature along the network
+        options:
+          kpis:
+            - T_supply_i
+            - T_supply_h
+            - T_supply_g
+            - T_supply_f
+            - T_supply_e
+            - T_supply_district
+          x_labels:
+            - i
+            - h
+            - g
+            - f
+            - e
+            - SimpleDistrict_1
+          y_title: Temperature [C]
+
+      - visual: profile
+        title: Return temperature along the network
+        options:
+          kpis:
+            - T_return_i
+            - T_return_h
+            - T_return_g
+            - T_return_f
+            - T_return_e
+            - T_return_district
+          x_labels:
+            - i
+            - h
+            - g
+            - f
+            - e
+            - SimpleDistrict_1
+          y_title: Temperature [C]
+
+    # One submission against the reference
+    detail:
+      - visual: kpi_table
+        title: Key performance indicators
+        options:
+          kpis: all
+          deviation: true
+
+      - visual: closeness_bar
+        title: Closeness to the reference, among all submissions
+
+      - visual: profile
+        title: Supply temperature along the network
+        options:
+          kpis:
+            - T_supply_i
+            - T_supply_h
+            - T_supply_g
+            - T_supply_f
+            - T_supply_e
+            - T_supply_district
+          x_labels:
+            - i
+            - h
+            - g
+            - f
+            - e
+            - SimpleDistrict_1
+          y_title: Temperature [C]
+
+      - visual: profile
+        title: Return temperature along the network
+        options:
+          kpis:
+            - T_return_i
+            - T_return_h
+            - T_return_g
+            - T_return_f
+            - T_return_e
+            - T_return_district
+          x_labels:
+            - i
+            - h
+            - g
+            - f
+            - e
+            - SimpleDistrict_1
+          y_title: Temperature [C]
+
+      - visual: time_series
+        title: Time series
+        description: The run should be in steady state, so every line should be flat.
+        options:
+          columns:
+            - m_flow_supply_i
+            - T_return_i
+            - Q_supplied
+          show_reference: true
+
+      - visual: metadata_table
+        title: Metadata
+        description: The complete ResultMetadata file of this submission.
+        options:
+          sections: all
+
+    # A selection of submissions against the reference
+    comparison:
+      - visual: kpi_table
+        title: Key performance indicators
+        options:
+          kpis: all
+          deviation: true
+
+      - visual: closeness_bar
+        title: Closeness to the reference, among all submissions
+
+      - visual: deviation_heatmap
+        title: Deviation from the reference [%]
+        options:
+          kpis: all
+
+      - visual: kpi_bar
+        title: Pressure drops
+        options:
+          kpis:
+            - dp_supply_i_e
+            - dp_return_a_i
+            - dp_return_i_h
+
+      - visual: kpi_bar
+        title: Heat loss and heat supplied
+        options:
+          kpis:
+            - Q_loss_supply_i_h
+            - Q_supplied
+
+      - visual: profile
+        title: Return temperature along the network
+        options:
+          kpis:
+            - T_return_i
+            - T_return_h
+            - T_return_g
+            - T_return_f
+            - T_return_e
+            - T_return_district
+          x_labels:
+            - i
+            - h
+            - g
+            - f
+            - e
+            - SimpleDistrict_1
+          y_title: Temperature [C]
+
+      - visual: metadata_table
+        title: Model and simulation, side by side
+        description: Differences in modelling choices often explain differences in results.

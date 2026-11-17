@@ -48,9 +48,13 @@ docs = [
     "mkdocs-material>=9.7",
     "mkdocstrings[python]>=1.0",
 ]
+web = [  # the web app (src/destest/webapp); the Docker image installs only this group
+    "dash>=4.0",
+    "gunicorn>=23 ; sys_platform != 'win32'",  # production web server (Linux)
+]
 
 [tool.uv]
-default-groups = ["dev", "docs"]
+default-groups = ["dev", "docs", "web"]
 
 [build-system]
 requires = ["uv_build>=0.13.5,<0.14"]
@@ -84,6 +88,12 @@ strict = true
 files = ["src", "tests", "scripts"]
 mypy_path = "src"
 warn_unreachable = true
+
+[[tool.mypy.overrides]]
+# Dash's @callback and register_page are not fully typed; allow them in the web app.
+module = ["destest.webapp.*"]
+disallow_untyped_decorators = false
+disallow_untyped_calls = false
 
 # ---------------------------------------------------------------- pytest & coverage
 [tool.pytest.ini_options]

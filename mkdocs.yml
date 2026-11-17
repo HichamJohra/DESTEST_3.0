@@ -34,6 +34,8 @@ nav:
   - Checking submissions: checking.md
   - Naming convention: naming-convention.md
   - ResultMetadata files: result-metadata.md
+  - Dashboards: dashboards.md
+  - Web app: web-app.md
   - Project structure: project-structure.md
   - Development: development.md
   - API reference: reference.md

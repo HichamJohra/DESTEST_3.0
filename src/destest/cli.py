@@ -12,6 +12,8 @@
     destest metadata-template CME_DHN_1                 print a blank template for a CME
     destest data-template CME_DHN_1 -o FILE             write an empty ResultData file (header only)
     destest new-submission --series DHN ... -o FOLDER   correctly named ResultData + ResultMetadata
+    destest dashboard CME_DHN_1 --kind overview         dashboard as an HTML page (or .json)
+    destest web                                         run the web app on http://127.0.0.1:8050
     destest convention                                  print the naming rules
 
     destest check "Result data"                         everything: names, pairing, content
@@ -23,6 +25,8 @@ New commands are added as another sub-parser in `build_parser()`. The options of
 """
 
 import argparse
+import json
+import os
 import sys
 from collections.abc import Sequence
 from datetime import datetime
@@ -54,7 +58,9 @@ from .specs import (
     cme_spec_path,
     list_cme_specs,
     load_cme_spec_file,
+    load_locations,
     load_result_metadata_layout,
+    locations_path,
     naming_convention_path,
     result_metadata_layout_path,
 )
@@ -164,6 +170,60 @@ def _cmd_new_submission(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_dashboard(args: argparse.Namespace) -> int:
+    from .analysis import build_dashboard, render_html  # imported only when needed
+    from .results import Submission, load_cme_submissions
+    from .specs import load_cme_spec
+
+    parts = args.cme.split("_")
+    if not (len(parts) == 3 and parts[0] == "CME" and parts[2].isdigit()):
+        print(f"Give a CME such as CME_DHN_1 (got '{args.cme}').", file=sys.stderr)
+        return 2
+    spec = load_cme_spec(parts[1], int(parts[2]))
+    folder = Path(args.folder) if args.folder else Path("Result data") / args.cme
+    try:
+        subs = load_cme_submissions(folder)
+    except (NotADirectoryError, ValueError) as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    focus: list[Submission] | None = None
+    if args.submission:
+        focus = []
+        for wanted in args.submission:
+            hits = [s for s in subs if wanted.lower() in (s.id + " " + s.label).lower()]
+            if len(hits) != 1:
+                found = ", ".join(s.label for s in hits) or "none"
+                print(f"--submission '{wanted}' matches {len(hits)}: {found}", file=sys.stderr)
+                return 2
+            focus.append(hits[0])
+    try:
+        board = build_dashboard(spec, subs, args.kind, focus)
+    except ValueError as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    out = Path(args.output) if args.output else Path("output") / f"{args.cme}_{args.kind}.html"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if out.suffix.lower() == ".json":
+        out.write_text(json.dumps(board.to_dict(), indent=1), encoding="utf-8")
+    else:
+        out.write_text(render_html(board), encoding="utf-8")
+    print(f"Dashboard written to {out}")
+    return 0
+
+
+def _cmd_web(args: argparse.Namespace) -> int:
+    if args.results:
+        os.environ["DESTEST_RESULTS"] = args.results
+    try:
+        from .webapp.app import main as run_web  # imported only when needed
+    except ImportError as exc:
+        print(f"The web app needs Dash ({exc}). Run `uv sync` to install it.", file=sys.stderr)
+        return 2
+    print(f"DESTEST web app on http://{args.host}:{args.port}  (Ctrl+C to stop)")
+    run_web(host=args.host, port=args.port, debug=args.debug)
+    return 0
+
+
 def _cmd_convention(args: argparse.Namespace) -> int:
     print(describe())
     return 0
@@ -173,6 +233,8 @@ def _cmd_specs(args: argparse.Namespace) -> int:
     print(f"Naming convention: {naming_convention_path()}  OK")
     load_result_metadata_layout()
     print(f"ResultMetadata layout: {result_metadata_layout_path()}  OK")
+    places = load_locations()
+    print(f"Locations: {locations_path()}  OK  ({len(places.cities)} cities)")
     ok = True
     for name in list_cme_specs():
         _, series, number = name.split("_")
@@ -340,6 +402,27 @@ def build_parser() -> argparse.ArgumentParser:
     ns.add_argument("-o", "--output", required=True, help="folder to write to, e.g. CME_DHN_1")
     ns.add_argument("--force", action="store_true", help="overwrite existing files")
     ns.set_defaults(func=_cmd_new_submission)
+
+    db = sub.add_parser("dashboard", help="build a dashboard of a CME (HTML page or JSON)")
+    db.add_argument("cme", help="the CME, e.g. CME_DHN_1")
+    db.add_argument("--kind", choices=["overview", "detail", "comparison"], default="overview")
+    db.add_argument(
+        "--submission",
+        action="append",
+        help="a submission to show (part of its file name or label); repeat for a comparison",
+    )
+    db.add_argument("--folder", help='folder with the results (default: "Result data/<CME>")')
+    db.add_argument(
+        "-o", "--output", help="output .html or .json (default: output/<CME>_<kind>.html)"
+    )
+    db.set_defaults(func=_cmd_dashboard)
+
+    wb = sub.add_parser("web", help="run the web app (dashboards) locally")
+    wb.add_argument("--results", help='folder with one sub-folder per CME (default: "Result data")')
+    wb.add_argument("--host", default="127.0.0.1")
+    wb.add_argument("--port", type=int, default=8050)
+    wb.add_argument("--debug", action="store_true", help="reload on code changes, show errors")
+    wb.set_defaults(func=_cmd_web)
 
     mt = sub.add_parser("metadata-template", help="write a ResultMetadata template")
     mt.add_argument(

@@ -6,6 +6,7 @@ value or a wrong type stops with a message that names the place in the file
 
 - `naming_convention.yaml` -> `NamingConvention` (one file for all CMEs)
 - `result_metadata.yaml` -> `ResultMetadataLayout` (one file for all CMEs)
+- `locations.yaml` -> `Locations` (coordinates for the map of contributions)
 - `cme/CME_<Series>_<Number>.yaml` -> `CmeSpec` (one file per CME)
 
 To add a new setting to a YAML file, add it to the matching model first;
@@ -14,7 +15,7 @@ unknown keys are rejected so that typos do not pass silently.
 
 import re
 import string
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -396,6 +397,73 @@ class ResultMetadataLayout(_Strict):
         return self
 
 
+class Coordinates(_Strict):
+    """A point on the map, in degrees."""
+
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=180)
+
+
+class Locations(_Strict):
+    """Contents of `locations.yaml`: where institutions are, for the map."""
+
+    schema_version: Literal[1]
+    cities: dict[str, Coordinates] = Field(default_factory=dict)  # "City, Country" -> point
+    countries: dict[str, Coordinates] = Field(default_factory=dict)  # fallback: centre
+
+    @field_validator("cities")
+    @classmethod
+    def _city_and_country(cls, v: dict[str, Coordinates]) -> dict[str, Coordinates]:
+        bad = [k for k in v if len([p for p in k.split(", ") if p.strip()]) != 2]
+        if bad:
+            raise ValueError(f"write cities as 'City, Country': {', '.join(bad)}")
+        return v
+
+
+class KpiSpec(_Strict):
+    """One KPI: a KPI function (see `destest.analysis.kpis`) applied to one column."""
+
+    key: str = Field(pattern=_KEY)
+    label: str = Field(min_length=1)
+    column: str  # column key in result_data.columns
+    function: str  # name of a KPI function
+    unit: str = ""
+    params: dict[str, Any] = Field(default_factory=dict)  # keyword parameters of the function
+
+
+class PanelSpec(_Strict):
+    """One element of a dashboard: a visual (see `destest.analysis.visuals`) and its options."""
+
+    visual: str
+    title: str = Field(min_length=1)
+    description: str = ""
+    options: dict[str, Any] = Field(default_factory=dict)
+
+
+class DashboardsSpec(_Strict):
+    """The visuals of the three dashboards, in display order."""
+
+    overview: list[PanelSpec] = Field(default_factory=list)
+    detail: list[PanelSpec] = Field(default_factory=list)
+    comparison: list[PanelSpec] = Field(default_factory=list)
+
+
+class AnalysisSpec(_Strict):
+    """KPIs and dashboards of a CME."""
+
+    reference: Literal["median", "mean"] = "median"
+    kpis: list[KpiSpec] = Field(min_length=1)
+    dashboards: DashboardsSpec = DashboardsSpec()
+
+    @model_validator(mode="after")
+    def _unique(self) -> "AnalysisSpec":
+        keys = [k.key for k in self.kpis]
+        doubles = sorted({k for k in keys if keys.count(k) > 1})
+        if doubles:
+            raise ValueError(f"kpis: key used more than once: {', '.join(doubles)}")
+        return self
+
+
 class CmeSpec(_Strict):
     """Contents of `cme/CME_<Series>_<Number>.yaml`."""
 
@@ -403,6 +471,16 @@ class CmeSpec(_Strict):
     cme: CmeInfo
     result_data: ResultDataSpec
     result_metadata: ResultMetadataSpec
+    analysis: AnalysisSpec | None = None
+
+    @model_validator(mode="after")
+    def _kpi_columns(self) -> "CmeSpec":
+        if self.analysis is not None:
+            columns = {c.key for c in self.result_data.columns}
+            for k in self.analysis.kpis:
+                if k.column not in columns:
+                    raise ValueError(f"analysis.kpis.{k.key}.column: '{k.column}' is not a column")
+        return self
 
     @property
     def folder_name(self) -> str:

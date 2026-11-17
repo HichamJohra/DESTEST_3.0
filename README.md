@@ -23,6 +23,7 @@ Requires [uv](https://docs.astral.sh/uv/getting-started/installation/).
 ```bash
 uv sync                                                # set up .venv with everything needed
 uv run destest check "Result data"                     # check names, pairing and content
+uv run destest web                                     # web app on http://127.0.0.1:8050
 uv run pytest                                          # run the tests
 uv run pre-commit install                              # run the checks before each commit
 ```
@@ -33,6 +34,8 @@ uv run pre-commit install                              # run the checks before e
 - [Checking submissions](docs/checking.md)
 - [Naming convention](docs/naming-convention.md)
 - [ResultMetadata files](docs/result-metadata.md)
+- [Dashboards](docs/dashboards.md): KPIs and visuals per CME
+- [Web app](docs/web-app.md): the dashboards in the browser (Dash), Docker
 - [Project structure](docs/project-structure.md)
 - [Development](docs/development.md): uv, Ruff, mypy, pre-commit, CI, docs site
 

@@ -4,6 +4,7 @@
 specs/
 ├── naming_convention.yaml     file-name rules, shared by all CMEs
 ├── result_metadata.yaml       sections of a ResultMetadata file, shared by all CMEs
+├── locations.yaml             coordinates of cities, for the map of contributions
 └── cme/
     └── CME_DHN_1.yaml         content rules for one CME (one file per CME)
 ```
@@ -30,10 +31,11 @@ from typing import Any, TypeVar
 import yaml
 from pydantic import BaseModel, ValidationError
 
-from .schema import CmeSpec, MetadataField, NamingConvention, ResultMetadataLayout
+from .schema import CmeSpec, Locations, MetadataField, NamingConvention, ResultMetadataLayout
 
 __all__ = [
     "CmeSpec",
+    "Locations",
     "NamingConvention",
     "ResultMetadataLayout",
     "SpecError",
@@ -41,10 +43,13 @@ __all__ = [
     "list_cme_specs",
     "load_cme_spec",
     "load_cme_spec_file",
+    "load_locations",
+    "load_locations_file",
     "load_naming_convention",
     "load_naming_convention_file",
     "load_result_metadata_layout",
     "load_result_metadata_layout_file",
+    "locations_path",
     "naming_convention_path",
     "result_metadata_layout_path",
 ]
@@ -63,6 +68,22 @@ def _spec_dir() -> Path:
 def naming_convention_path() -> Path:
     """Path of the packaged `naming_convention.yaml`."""
     return _spec_dir() / "naming_convention.yaml"
+
+
+def locations_path() -> Path:
+    """Path of the packaged `locations.yaml`."""
+    return _spec_dir() / "locations.yaml"
+
+
+def load_locations_file(path: Path) -> Locations:
+    """Load and check a locations file (any path)."""
+    return _parse(Locations, _read_yaml(path), path)
+
+
+@cache
+def load_locations() -> Locations:
+    """The packaged locations (loaded once, then cached)."""
+    return load_locations_file(locations_path())
 
 
 def result_metadata_layout_path() -> Path:
@@ -133,6 +154,49 @@ def _bad_must_match(fields: list[MetadataField], where: str, conv: NamingConvent
     ]
 
 
+def _check_analysis(spec: CmeSpec) -> list[str]:
+    """Names in the `analysis` section that the analysis code does not know."""
+    if spec.analysis is None:
+        return []
+    from ..analysis.kpis import KPI_FUNCTIONS, parameters  # here: avoids an import cycle
+    from ..analysis.visuals import VISUALS
+
+    problems: list[str] = []
+    kpi_keys = {k.key for k in spec.analysis.kpis}
+    columns = {c.key for c in spec.result_data.columns}
+    for k in spec.analysis.kpis:
+        where = f"analysis.kpis.{k.key}"
+        if k.function not in KPI_FUNCTIONS:
+            known = ", ".join(sorted(KPI_FUNCTIONS))
+            problems.append(f"{where}.function: unknown '{k.function}' (known: {known})")
+            continue
+        extra = sorted(set(k.params) - parameters(k.function))
+        if extra:
+            problems.append(f"{where}.params: '{k.function}' has no parameter {', '.join(extra)}")
+    for kind in ("overview", "detail", "comparison"):
+        for i, panel in enumerate(getattr(spec.analysis.dashboards, kind)):
+            where = f"analysis.dashboards.{kind}[{i}]"
+            v = VISUALS.get(panel.visual)
+            if v is None:
+                known = ", ".join(sorted(VISUALS))
+                problems.append(f"{where}.visual: unknown '{panel.visual}' (known: {known})")
+                continue
+            extra = sorted(set(panel.options) - v.options)
+            if extra:
+                names = ", ".join(extra)
+                problems.append(f"{where}.options: '{panel.visual}' has no option {names}")
+            for opt, known_keys, what in [
+                *((o, kpi_keys, "KPI") for o in v.kpi_options),
+                *((o, columns, "column") for o in v.column_options),
+            ]:
+                value = panel.options.get(opt)
+                given = [value] if isinstance(value, str) else list(value or [])
+                bad = [n for n in given if n != "all" and n not in known_keys]
+                if bad:
+                    problems.append(f"{where}.options.{opt}: not a {what} key: {', '.join(bad)}")
+    return problems
+
+
 def load_result_metadata_layout_file(
     path: Path, convention: NamingConvention | None = None
 ) -> ResultMetadataLayout:
@@ -158,6 +222,7 @@ def load_cme_spec_file(path: Path, convention: NamingConvention | None = None) -
     meta = spec.result_metadata
     for name in ("simulation_config", "model_details"):
         problems += _bad_must_match(getattr(meta, name), f"result_metadata.{name}", conv)
+    problems += _check_analysis(spec)
     _raise_if(problems, path)
     return spec
 

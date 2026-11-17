@@ -93,3 +93,15 @@ Generated from the docstrings in `src/destest`.
 ## New submission
 
 ::: destest.submission
+
+## Submissions
+
+::: destest.results
+
+## Analysis and dashboards
+
+::: destest.analysis.kpis
+::: destest.analysis.accuracy_metric
+::: destest.analysis.context
+::: destest.analysis.visuals
+::: destest.analysis.dashboard

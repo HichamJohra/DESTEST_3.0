@@ -6,6 +6,7 @@ DESTEST_3.0/
 ├── uv.lock                   exact versions of every dependency (written by uv; commit it)
 ├── .python-version           Python version uv uses for the local environment
 ├── .pre-commit-config.yaml   checks run before each commit
+├── Dockerfile                container image of the web app (gunicorn)
 ├── mkdocs.yml                documentation site settings
 ├── Result data/              submitted result files, one folder per exercise (CME_DHN_1, …)
 ├── src/
@@ -17,10 +18,24 @@ DESTEST_3.0/
 │       ├── specs/            the rules, as YAML files (edit these, not the code)
 │       │   ├── naming_convention.yaml   file-name rules, shared by all CMEs
 │       │   ├── result_metadata.yaml     sections of a ResultMetadata file, shared by all CMEs
+│       │   ├── locations.yaml           coordinates of cities, for the map of contributions
 │       │   ├── cme/CME_DHN_1.yaml       content rules, one file per CME
 │       │   ├── schema.py                the allowed layout of those files (pydantic)
 │       │   ├── expressions.py           the safe mini-language of the consistency rules
 │       │   └── __init__.py              load_naming_convention(), load_cme_spec()
+│       ├── webapp/           the web app (Dash): pages render the dashboards of the specs
+│       │   ├── app.py          Dash app, navigation; `server` for gunicorn
+│       │   ├── data.py         CMEs, submissions, dashboards (cached)
+│       │   ├── components.py   layout blocks, rendering of the dashboard panels
+│       │   ├── pages/          home, overview, detail, comparison, contribute, about
+│       │   └── assets/         style.css
+│       ├── analysis/         KPIs, metrics, visuals, dashboards (shared by all CMEs)
+│       │   ├── kpis.py         KPI functions, e.g. steady_state, integral
+│       │   ├── accuracy_metric.py  accuracy vs the reference, e.g. relative_deviation, nmbe
+│       │   ├── context.py      KPIs of every submission + reference, computed once
+│       │   ├── visuals.py      tables and figures, e.g. kpi_table, profile, carpet
+│       │   └── dashboard.py    the dashboards of a CME, as JSON or an HTML page
+│       ├── results.py        load the submissions of a CME (time series + metadata)
 │       ├── check.py          `destest check`: names, pairing and content in one go
 │       ├── result.py         shared result types: Issue, CheckResult (base of every check)
 │       ├── submission.py     create the two files of a new submission
@@ -39,10 +54,12 @@ DESTEST_3.0/
 │   ├── check_results.py      full check of "Result data" (one click in PyCharm)
 │   └── new_submission.py     create a new, correctly named file pair (fill in the values first)
 ├── tests/                    automatic tests
+│   ├── test_analysis.py
 │   ├── test_data_check.py
 │   ├── test_filename_check.py
 │   ├── test_metadata_check.py
-│   └── test_specs.py
+│   ├── test_specs.py
+│   └── test_webapp.py
 ├── docs/                     this documentation (Markdown)
 └── .github/
     ├── workflows/ci.yml      tests + checks on every push and pull request
