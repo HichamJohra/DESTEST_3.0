@@ -1,0 +1,19 @@
+# Opens a pull request once a month when a GitHub Action or a Python dependency
+# in uv.lock has a new version, so pinned versions do not silently go stale.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      python:
+        patterns: ["*"]
