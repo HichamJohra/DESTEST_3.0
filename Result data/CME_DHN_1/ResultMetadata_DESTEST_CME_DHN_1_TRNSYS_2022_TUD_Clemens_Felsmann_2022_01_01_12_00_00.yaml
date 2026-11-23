@@ -1,0 +1,83 @@
+# =============================================================================
+# DESTEST 3.0 - ResultMetadata file for CME_DHN_1
+# Steady-state simulation of a district heating network
+# =============================================================================
+# PRE-FILLED by the DESTEST organisers on 16 Nov 2026 from the file name and the
+# DESTEST case report. Values 'TO BE PROVIDED BY THE MODELLER' are not known yet.
+# One ResultMetadata file per ResultData file; it describes that one submission.
+# Save it next to the ResultData file, with the same name except:
+#   ResultData_....csv  ->  ResultMetadata_....yaml
+# Keep EVERY key and the indentation; only change the values.
+# A missing or an extra key is an error. 'required' values must be filled in.
+# Write text that looks like a number in quotes, e.g. "18.40".
+# This file is published in a PUBLIC repository.
+# =============================================================================
+
+metadata_format_version: 1              # do not change
+
+# -----------------------------------------------------------------------------
+# submission_info
+# -----------------------------------------------------------------------------
+submission_info:
+  cme: "CME_DHN_1"                      # required - The CME, e.g. CME_DHN_1; must match the folder and the file name
+  result_data_file: "ResultData_DESTEST_CME_DHN_1_TRNSYS_2022_TUD_Clemens_Felsmann_2022_01_01_12_00_00.csv" # required - Name of the ResultData file this file describes
+  creation_date_time: 2022-01-01 12:00:00 # required - Date and time the ResultData file was created, as in its name (YYYY-MM-DD hh:mm:ss)
+
+# -----------------------------------------------------------------------------
+# modeller
+# -----------------------------------------------------------------------------
+modeller:
+  first_name: "Clemens"                 # required - Same as in the file name
+  last_name: "Felsmann"                 # required - Same as in the file name
+  institution: "TUD"                    # required - Short form, same as in the file name
+  institution_full_name: "Technische Universitaet Dresden" # required - e.g. Technische Universitaet Dresden
+  institution_city: "Dresden"           # required - e.g. Dresden (for the map of contributions)
+  institution_country: "Germany"        # required - e.g. Germany
+  orcid: ""                             # optional - e.g. 0000-0002-1825-0097
+
+# -----------------------------------------------------------------------------
+# modelling_tool
+# -----------------------------------------------------------------------------
+modelling_tool:
+  name: "TRNSYS"                        # required - Same as in the file name
+  version: "2022"                       # required - Same as in the file name (write it in quotes, e.g. "18.4")
+  licence: "commercial"                 # required - e.g. commercial, open-source (MIT), in-house
+  url: "https://www.trnsys.com"         # optional - Website of the tool
+  libraries: ""                         # optional - Libraries / packages used, with versions, e.g. Modelica Buildings 11.0.0
+
+# -----------------------------------------------------------------------------
+# simulation_config
+# -----------------------------------------------------------------------------
+simulation_config:
+  solver: ""                            # optional - Solver / numerical method, e.g. DASSL, Euler, Newton-Raphson
+  time_step_s: "TO BE PROVIDED BY THE MODELLER" # required - Simulation time step [s]; "variable" if adaptive
+  tolerance: ""                         # optional - Solver tolerance, e.g. 1e-6
+  computation_time_s: ""                # optional - Wall-clock time of the run [s]
+  computer_configuration: ""            # optional - Computer used, e.g. Intel i7-1365U, 32 GB RAM, Windows 11
+
+# -----------------------------------------------------------------------------
+# model_details
+# -----------------------------------------------------------------------------
+model_details:
+  pipe_model: ""                        # optional - e.g. plug-flow pipe, finite-volume pipe, steady-state pipe
+  pipe_discretisation: ""               # optional - e.g. 10 volumes per pipe; "none" for plug-flow
+  pipe_wall_thermal_capacity: ""        # optional - Included or neglected
+  friction_factor_correlation: ""       # optional - e.g. Colebrook-White, Swamee-Jain, Haaland
+  heat_loss_calculation: ""             # optional - How the heat loss through pipe wall and insulation is computed
+  fluid_properties_used: ""             # optional - e.g. constant, as in the description; or what was used instead
+  substation_model: ""                  # optional - e.g. ideal pump with prescribed mass flow, valve + ideal heat extractor
+  steady_state_approach: ""             # optional - How steady state was reached and checked (duration, initial values)
+
+# -----------------------------------------------------------------------------
+# deviations
+# -----------------------------------------------------------------------------
+# required - Every way this result departs from the CME description; "none" if there is none
+deviations: "TO BE PROVIDED BY THE MODELLER (write none if there is none)"
+
+# -----------------------------------------------------------------------------
+# other_comments
+# -----------------------------------------------------------------------------
+# optional - Anything else the organisers should know
+other_comments: |
+  Column headers replaced by the DESTEST organisers in Nov 2026 to match the CME_DHN_1 spec (columns matched by position); values unchanged.
+  Corrected version of the 2021 TRNSYS submission (correction on pressure drop), according to the DESTEST case report draft of 16 Oct 2026.

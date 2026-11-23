@@ -1,0 +1,109 @@
+# Project settings: package metadata, dependencies and tool configuration.
+# Day-to-day commands (see docs/development.md):
+#   uv sync                      create/update .venv with the package and all dev tools
+#   uv run pytest                run the tests
+#   uv run pre-commit run -a     run every check (Ruff, mypy, file names, ...)
+#   uv run mkdocs serve          preview the documentation site
+
+[project]
+name = "destest"
+version = "0.1.0"
+description = "Tools and web app for the District Energy Simulation Test Procedure (DESTEST)"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Hicham Johra" }]
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.11",  # checks the YAML spec files and gives clear error messages
+    "pyyaml>=6.0.2",   # reads the YAML spec files
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Repository = "https://github.com/HichamJohra/DESTEST_3.0"
+Documentation = "https://hichamjohra.github.io/DESTEST_3.0/"
+
+[project.scripts]
+destest = "destest.cli:main"  # the `destest` terminal command
+
+# Development-only dependencies (PEP 735). `uv sync` installs both groups.
+[dependency-groups]
+dev = [
+    "mypy>=2.4",
+    "pre-commit>=4.7",
+    "pytest>=9.1",
+    "pytest-cov>=7.1",
+    "ruff>=0.17",
+    "types-pyyaml>=6.0",  # type hints of PyYAML, for mypy
+]
+docs = [
+    "mkdocs>=1.6,<2",  # MkDocs 2 is a rewrite; stay on 1.x until the theme supports it
+    "mkdocs-material>=9.7",
+    "mkdocstrings[python]>=1.0",
+]
+web = [  # the web app (src/destest/webapp); the Docker image installs only this group
+    "dash>=4.0",
+    "gunicorn>=23 ; sys_platform != 'win32'",  # production web server (Linux)
+]
+
+[tool.uv]
+default-groups = ["dev", "docs", "web"]
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14"]
+build-backend = "uv_build"
+
+# ---------------------------------------------------------------- Ruff
+[tool.ruff]
+line-length = 100
+extend-exclude = ["Result data"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",  # pycodestyle
+    "F",       # pyflakes
+    "I",       # import sorting
+    "B",       # bugbear: likely bugs
+    "UP",      # pyupgrade: modern syntax for the minimum Python version
+    "SIM",     # simplifications
+    "C4",      # comprehensions
+    "PT",      # pytest style
+    "RUF",     # Ruff-specific
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]  # long file names in test data
+
+# ---------------------------------------------------------------- mypy
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src", "tests", "scripts"]
+mypy_path = "src"
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+# Dash's @callback and register_page are not fully typed; allow them in the web app.
+module = ["destest.webapp.*"]
+disallow_untyped_decorators = false
+disallow_untyped_calls = false
+
+# ---------------------------------------------------------------- pytest & coverage
+[tool.pytest.ini_options]
+testpaths = ["tests", "src"]  # src: the >>> examples in docstrings are run as tests too
+addopts = ["-ra", "--strict-markers", "--strict-config", "--doctest-modules", "--import-mode=importlib"]
+
+[tool.coverage.run]
+source = ["destest"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
