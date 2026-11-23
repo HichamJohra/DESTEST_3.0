@@ -64,15 +64,40 @@ def spread(points: list[MapPoint], radius: float = 0.25) -> None:
                 p.lon = lon + 1.6 * radius * math.cos(angle)
 
 
-def auto_view(points: list[MapPoint]) -> tuple[dict[str, float], float]:
-    """Centre and zoom that show all points (as in the NSBI app)."""
+def _mercator_y(lat: float) -> float:
+    """Web Mercator y of a latitude (radians of the projected plane)."""
+    lat = max(-85.0, min(85.0, lat))
+    return math.log(math.tan(math.pi / 4 + math.radians(lat) / 2))
+
+
+def auto_view(
+    points: list[MapPoint],
+    height: int = 480,
+    width: int = 600,
+    padding: float = 1.4,
+    max_zoom: float = 7.0,
+) -> tuple[dict[str, float], float]:
+    """Centre and zoom that show all points in a `width` x `height` pixel map.
+
+    Works in Web Mercator pixels (512 px tiles, as in MapLibre): the zoom is the
+    largest that fits both the east-west and the north-south spread, times
+    `padding` for the markers and the legend. `width` is a conservative guess,
+    since the map stretches with the page.
+    """
     if not points:
         return {"lat": 50.0, "lon": 10.0}, 2.5
     lats, lons = [p.lat for p in points], [p.lon for p in points]
-    center = {"lat": (min(lats) + max(lats)) / 2, "lon": (min(lons) + max(lons)) / 2}
-    extent = max(max(lats) - min(lats), max(lons) - min(lons), 4.0)
-    zoom = max(1.0, min(12.0, math.log2(360 / extent) - 0.6))
-    return center, zoom
+    y_min, y_max = _mercator_y(min(lats)), _mercator_y(max(lats))
+    y_mid = (y_min + y_max) / 2
+    center = {
+        "lat": math.degrees(2 * math.atan(math.exp(y_mid)) - math.pi / 2),
+        "lon": (min(lons) + max(lons)) / 2,
+    }
+    world = 512 / (2 * math.pi)  # pixels per projected radian at zoom 0
+    span_x = max(math.radians(max(lons) - min(lons)), 1e-6) * padding
+    span_y = max(y_max - y_min, 1e-6) * padding
+    zoom = min(math.log2(width / (world * span_x)), math.log2(height / (world * span_y)))
+    return center, max(1.0, min(max_zoom, zoom))
 
 
 def category_map(
@@ -103,7 +128,7 @@ def category_map(
                 }
             )
             owners.append(f_i)
-    center, zoom = auto_view(points)
+    center, zoom = auto_view(points, height=height)
     layout: dict[str, Any] = {
         "map": {"style": BASEMAP, "center": center, "zoom": zoom},
         "height": height,

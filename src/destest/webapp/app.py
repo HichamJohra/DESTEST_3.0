@@ -68,7 +68,8 @@ def create_app() -> Dash:
         suppress_callback_exceptions=True,
     )
     for page in PAGES:
-        importlib.import_module(f"{__package__}.pages.{page}")
+        # Absolute name, not __package__: that is None when this file is run as a script.
+        importlib.import_module(f"destest.webapp.pages.{page}")
     app.layout = html.Div(
         [
             navbar(app),
