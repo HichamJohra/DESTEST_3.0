@@ -37,6 +37,25 @@ PALETTE = (
 )
 REFERENCE_COLOR = "#000000"
 
+#: How each reference method (`analysis.reference` in the CME spec) is built, in words.
+REFERENCE_METHODS = {
+    "median": "Median of all valid submissions",
+    "mean": "Mean (arithmetic average) of all valid submissions",
+}
+
+
+def describe_reference(analysis: AnalysisSpec, n_submissions: int) -> str:
+    """The reference of a CME in one sentence, e.g. for the dashboard header.
+
+    >>> from destest.specs import load_cme_spec
+    >>> describe_reference(load_cme_spec("DHN", 1).analysis, 7)  # doctest: +ELLIPSIS
+    'Median of all valid submissions (currently 7), KPI by KPI...'
+    """
+    return (
+        f"{REFERENCE_METHODS[analysis.reference]} (currently {n_submissions}), "
+        "KPI by KPI and point by point for the time series."
+    )
+
 
 def compute_kpis(spec: CmeSpec, sub: Submission) -> dict[str, float | None]:
     """Every KPI of the CME for one submission, by KPI key."""

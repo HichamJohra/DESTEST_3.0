@@ -19,7 +19,7 @@ from typing import Any, Literal
 
 from ..results import Submission
 from ..specs.schema import CmeSpec
-from .context import build_context
+from .context import build_context, describe_reference
 from .visuals import VISUALS, Figure, Table
 
 Kind = Literal["overview", "detail", "comparison"]
@@ -59,6 +59,8 @@ class Dashboard:
     kind: str
     submissions: list[str]  # labels of the submissions shown
     panels: list[Panel] = field(default_factory=list)
+    description: str = ""  # what the CME tests (from its spec file)
+    reference: str = ""  # how the reference is built, in words
     created: str = field(default_factory=lambda: f"{datetime.now():%Y-%m-%d %H:%M}")
 
     def to_dict(self) -> dict[str, Any]:
@@ -68,6 +70,8 @@ class Dashboard:
             "title": self.title,
             "kind": self.kind,
             "submissions": self.submissions,
+            "description": self.description,
+            "reference": self.reference,
             "created": self.created,
             "panels": [p.to_dict() for p in self.panels],
         }
@@ -98,6 +102,8 @@ def build_dashboard(
     if kind == "detail":
         title += f": {ctx.focus[0].label}"
     board = Dashboard(spec.folder_name, title, kind, [s.label for s in ctx.focus])
+    board.description = spec.cme.description
+    board.reference = describe_reference(spec.analysis, len(submissions))
     for p in getattr(spec.analysis.dashboards, kind):
         result = VISUALS[p.visual].builder(ctx, **p.options)
         panel = Panel(p.title, p.visual, p.description)
@@ -177,6 +183,7 @@ def render_html(board: Dashboard) -> str:
         if f is not None
     )
     shown = ", ".join(board.submissions)
+    intro = f'<p class="desc">{html.escape(board.description)}</p>' if board.description else ""
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -185,7 +192,10 @@ def render_html(board: Dashboard) -> str:
 <style>{_CSS}</style></head>
 <body><header><h1>{html.escape(board.title)}</h1>
 <div class="meta">{len(board.submissions)} submission(s): {html.escape(shown)}
-- built {board.created} with destest</div></header>
+- built {board.created} with destest</div>
+<div class="meta">Reference: {html.escape(board.reference)}</div>
+</header>
+{intro}
 {"".join(parts)}
 <script>{scripts}</script>
 </body></html>

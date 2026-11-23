@@ -20,6 +20,22 @@ cme:
     DESTEST case report (IBPSA Project 1, WP3), draft 16 Oct 2026,
     section "Common exercise 0: Steady-state simulation of a district heating network" (Network_0)
   status: draft
+  description: >-
+    Checks that the fundamental equations for pressure drop and heat loss are modelled
+    adequately. All boundary conditions, including the supply temperature and the heat load
+    of each building, are constant: the network is simulated until steady state, and the
+    results are compared in terms of fluid temperature, heat loss and pressure drop.
+  characteristics:                 # label: value, shown in this order
+    Simulation: Steady state (constant boundary conditions)
+    District: 16 identical single-family dwellings in two streets
+    Network: Radial, supply and return pipes, nodes a to i, all at 1.5 m depth
+    Pipes: PE-X (ISO 15875-2, S5), roughness 0.007 mm, insulated
+    Heat source: Ideal source at node i, constant supply temperature 70 °C
+    Substations: Ideal heat extraction 19347.3 W and 555.4 kg/h each (30 K)
+    Heat loss: Constant 10 °C at the outer insulation surface, ground not modelled
+    Pressure drop: Wall friction only (no fittings, bends or installations)
+    Fluid: Water at 50 °C, constant properties (988 kg/m³, 4180 J/(kg·K), 5.5e-7 m²/s)
+    Results: 18 variables (Table 8), 10 time steps of 1 s
 
 # =============================================================================
 # ResultData file (.csv)
@@ -290,6 +306,16 @@ result_metadata:
 analysis:
 
   reference: median            # reference = median (or mean) of all submissions
+  reference_note: >-
+    There is no measured or analytical truth for this exercise. The median is used rather
+    than the mean so that a single outlying result does not shift the reference.
+
+  # Comments and observations on the results, one bullet each (last card of the overview).
+  comments_and_observations:
+    - Comment 1
+    - Comment 2
+    - Observation 1
+    - Observation 2
 
   # The 18 results of Table 8 in the case report, as steady-state values
   # (mean of the reported time steps; all are constant in a steady-state run).
@@ -406,6 +432,12 @@ analysis:
 
     # All submissions of the CME
     overview:
+      - visual: closeness_bar
+        title: Ranking by closeness to the reference
+        description: Grade 0-100 over all KPIs, best first (see the KPI table for the details).
+        options:
+          colors: rank
+
       - visual: data_check_table
         title: Submissions
         description: Creation date, result of `destest check` and closeness to the reference.
@@ -490,14 +522,22 @@ analysis:
 
     # One submission against the reference
     detail:
+      - visual: closeness_bar
+        title: Ranking by closeness to the reference
+        description: Grade 0-100 over all KPIs; colour and rank among all submissions of the CME.
+        options:
+          colors: rank
+          submissions: selected
+
+      - visual: data_check_table
+        title: Submission
+        description: Creation date, result of `destest check` and closeness to the reference.
+
       - visual: kpi_table
         title: Key performance indicators
         options:
           kpis: all
           deviation: true
-
-      - visual: closeness_bar
-        title: Closeness to the reference, among all submissions
 
       - visual: profile
         title: Supply temperature along the network
@@ -555,14 +595,22 @@ analysis:
 
     # A selection of submissions against the reference
     comparison:
+      - visual: closeness_bar
+        title: Ranking by closeness to the reference
+        description: Grade 0-100 over all KPIs, best first; colour and rank among all submissions.
+        options:
+          colors: rank
+          submissions: selected
+
+      - visual: data_check_table
+        title: Submissions
+        description: Creation date, result of `destest check` and closeness to the reference.
+
       - visual: kpi_table
         title: Key performance indicators
         options:
           kpis: all
           deviation: true
-
-      - visual: closeness_bar
-        title: Closeness to the reference, among all submissions
 
       - visual: deviation_heatmap
         title: Deviation from the reference [%]

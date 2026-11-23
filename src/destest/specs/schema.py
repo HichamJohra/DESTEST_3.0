@@ -202,6 +202,10 @@ class CmeInfo(_Strict):
     full_title: str = Field(min_length=1)
     description_reference: str = ""  # where the CME is described (report, section)
     status: Literal["draft", "active", "closed"] = "draft"
+    #: What the exercise tests, in a few sentences (shown on the dashboards).
+    description: str = Field(default="")
+    #: Key characteristics, label -> value (shown as a table, in this order).
+    characteristics: dict[str, str] = Field(default_factory=dict)
 
 
 class Range(_Strict):
@@ -452,6 +456,10 @@ class AnalysisSpec(_Strict):
     """KPIs and dashboards of a CME."""
 
     reference: Literal["median", "mean"] = "median"
+    #: Why this reference, or anything to know about it (shown with the reference).
+    reference_note: str = Field(default="")
+    #: Comments and observations on the results, one bullet each (end of the overview).
+    comments_and_observations: list[str] = Field(default_factory=list)
     kpis: list[KpiSpec] = Field(min_length=1)
     dashboards: DashboardsSpec = DashboardsSpec()
 

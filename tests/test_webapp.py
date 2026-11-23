@@ -105,6 +105,30 @@ def test_callbacks_build_the_dashboards(app: Any) -> None:
     assert "Choose" in str(comparison._comparison("CME_DHN_1", []))
 
 
+@needs_results
+def test_cme_info_card_comes_first(app: Any) -> None:
+    from destest.webapp.pages import comparison, detail, overview
+
+    for content in (
+        overview._overview("CME_DHN_1"),
+        detail._detail("CME_DHN_1", None),
+        comparison._comparison("CME_DHN_1", []),
+    ):
+        text = str(content[0])
+        assert "Steady-state simulation of a district heating network" in text
+        assert "Median of all valid submissions" in text
+        assert "Heat source" in text
+
+
+@needs_results
+def test_comments_card_ends_the_overview(app: Any) -> None:
+    from destest.webapp.pages import overview
+
+    last = str(overview._overview("CME_DHN_1")[-1])
+    assert "Comments and observations" in last
+    assert "Comment 1" in last
+
+
 def test_render_table() -> None:
     pytest.importorskip("dash")
     from destest.analysis import Table

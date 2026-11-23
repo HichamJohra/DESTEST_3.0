@@ -23,7 +23,7 @@ html_page = render_html(board)
 """
 
 from .accuracy_metric import SERIES_METRICS, VALUE_METRICS
-from .context import AnalysisContext, build_context, compute_kpis
+from .context import AnalysisContext, build_context, compute_kpis, describe_reference
 from .dashboard import KINDS, Dashboard, Panel, build_dashboard, render_html
 from .kpis import KPI_FUNCTIONS, kpi_function
 from .visuals import VISUALS, Table, visual
@@ -41,6 +41,7 @@ __all__ = [
     "build_context",
     "build_dashboard",
     "compute_kpis",
+    "describe_reference",
     "kpi_function",
     "render_html",
     "visual",

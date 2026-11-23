@@ -10,7 +10,8 @@ from typing import Any
 
 from dash import dcc, html
 
-from ..analysis import Dashboard, Panel, Table
+from ..analysis import Dashboard, Panel, Table, describe_reference
+from ..specs.schema import CmeSpec
 
 # Plotly options shared by all graphs (no Plotly logo in the mode bar).
 GRAPH_CONFIG: Any = {"displaylogo": False, "responsive": True}
@@ -96,6 +97,37 @@ def render_panel(p: Panel) -> html.Div:
 def render_dashboard(board: Dashboard) -> list[Any]:
     """All panels of a dashboard, in the order of the CME spec file."""
     return [render_panel(p) for p in board.panels]
+
+
+def cme_info_card(spec: CmeSpec, n_submissions: int) -> html.Div:
+    """Description, key characteristics and reference of a CME, from its spec file."""
+    info = spec.cme
+    rows: list[tuple[str, Any]] = list(info.characteristics.items())
+    if spec.analysis is not None:
+        reference: list[Any] = [describe_reference(spec.analysis, n_submissions)]
+        if spec.analysis.reference_note:
+            reference += [html.Br(), html.Span(spec.analysis.reference_note, className="muted")]
+        rows += [
+            ("Reference", reference),
+            ("KPIs", f"{len(spec.analysis.kpis)} compared with the reference"),
+        ]
+    rows += [("Status", info.status)]
+    if info.description_reference:
+        rows.append(("Described in", info.description_reference))
+    table = html.Table(
+        html.Tbody([html.Tr([html.Th(label), html.Td(value)]) for label, value in rows]),
+        className="info-table",
+    )
+    body = [html.P(info.description) if info.description else None, table]
+    return card(body, title=f"{spec.folder_name} - {info.full_title}")
+
+
+def comments_card(spec: CmeSpec) -> html.Div | None:
+    """Comments and observations on the results of a CME (bullets), or None if there are none."""
+    items = spec.analysis.comments_and_observations if spec.analysis is not None else []
+    if not items:
+        return None
+    return card(html.Ul([html.Li(text) for text in items]), title="Comments and observations")
 
 
 def skipped_notice(skipped: list[tuple[str, str]]) -> html.Details | None:

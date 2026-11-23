@@ -29,6 +29,11 @@ panel in order: figures as interactive Plotly graphs, tables as HTML tables. Add
 visual to a CME's `analysis` section, or adding a new CME with an `analysis` section, shows up
 in the app without changing the web code. See [Dashboards](dashboards.md).
 
+Below the exercise selection, every dashboard page first shows a card describing the CME
+(`cme.description`, `cme.characteristics`) and how its reference is built (`analysis.reference`,
+`analysis.reference_note`), all taken from the spec file. The overview page ends with a
+"Comments and observations" card listing `analysis.comments_and_observations` (if any).
+
 ## Structure
 
 ```text

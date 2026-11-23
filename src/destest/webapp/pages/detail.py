@@ -8,8 +8,16 @@ from typing import Any
 import dash
 from dash import Input, Output, State, callback, dcc, html
 
-from ..components import PERSIST, card, control, message, page_head, render_dashboard
-from ..data import dashboard, submission_options
+from ..components import (
+    PERSIST,
+    card,
+    cme_info_card,
+    control,
+    message,
+    page_head,
+    render_dashboard,
+)
+from ..data import dashboard, get_cme, submission_options
 from .overview import cme_dropdown
 
 
@@ -58,10 +66,14 @@ def _submissions(cme: str | None, current: str | None) -> tuple[list[dict[str, s
 
 @callback(Output("dt-content", "children"), Input("dt-cme", "value"), Input("dt-sub", "value"))
 def _detail(cme: str | None, sub_id: str | None) -> list[Any]:
-    if not cme or not sub_id:
+    if not cme:
         return [message("Choose an exercise and a submission.", "info")]
+    data = get_cme(cme)
+    info = cme_info_card(data.spec, len(data.submissions))
+    if not sub_id:
+        return [info, message("Choose a submission.", "info")]
     try:
         board = dashboard(cme, "detail", [sub_id])
     except ValueError as exc:
-        return [message(str(exc), "error")]
-    return render_dashboard(board)
+        return [info, message(str(exc), "error")]
+    return [info, *render_dashboard(board)]

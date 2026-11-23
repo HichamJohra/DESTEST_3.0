@@ -587,34 +587,52 @@ def carpet(
 
 
 @visual("closeness_bar")
-def closeness_bar(ctx: AnalysisContext) -> Figure:
+def closeness_bar(
+    ctx: AnalysisContext, *, colors: str = "submission", submissions: str = "all"
+) -> Figure:
     """Closeness-to-the-reference grade of every submission, best first.
 
-    The submissions of the dashboard are in colour; the others (on a detail or
-    comparison dashboard) in grey, to show where the focus stands among all.
+    `colors`: `submission` (each submission its own colour, as in the other charts)
+    or `rank` (green for the first to pale red for the last, as in the tables).
+    `submissions`: `all` (submissions not shown on the dashboard are grey, to show
+    where the focus stands among all) or `selected` (only the dashboard's own
+    submissions; the rank colours stay those among all).
     """
+    if submissions not in ("all", "selected"):
+        raise ValueError(f"submissions must be 'all' or 'selected' (got '{submissions}')")
     ranked = sorted(
         (s for s in ctx.submissions if ctx.closeness.get(s.id) is not None),
         key=lambda s: -(ctx.closeness[s.id] or 0.0),
     )
     focus_ids = {s.id for s in ctx.focus}
-    grades = [ctx.closeness[s.id] for s in ranked]
+    n = len(ranked)
+
+    def color(i: int, s: Submission) -> str:
+        if s.id not in focus_ids:
+            return "#cccccc"
+        return rank_color(i + 1, n) if colors == "rank" else ctx.colors[s.id]
+
+    shown = [(i, s) for i, s in enumerate(ranked) if submissions == "all" or s.id in focus_ids]
+    grades = [ctx.closeness[s.id] for _, s in shown]
     return {
         "data": [
             {
                 "type": "bar",
-                "x": [s.tick_label for s in ranked],
+                "x": [s.tick_label for _, s in shown],
                 "y": grades,
                 "text": [fmt(g, 3) for g in grades],
                 "textposition": "outside",
                 "marker": {
-                    "color": [ctx.colors[s.id] if s.id in focus_ids else "#cccccc" for s in ranked]
+                    "color": [color(i, s) for i, s in shown],
+                    "line": {"color": "#5d6675", "width": 0.5},
                 },
-                "hovertemplate": "%{x}<br>%{y:.1f}<extra></extra>",
+                "customdata": [f"rank {i + 1} of {n}" for i, _ in shown],
+                "hovertemplate": "%{x}<br>%{y:.1f} (%{customdata})<extra></extra>",
             }
         ],
         "layout": {
             "height": 380,
+            "bargap": 0.2 if len(shown) > 3 else 0.6,  # a single bar is not page-wide
             "margin": {"l": 60, "r": 20, "t": 20, "b": 70},
             "yaxis": {"title": {"text": CLOSENESS_LABEL}, "range": [0, 110]},
             "xaxis": {"tickangle": 0, "automargin": True},

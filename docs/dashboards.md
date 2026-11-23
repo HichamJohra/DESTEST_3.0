@@ -50,7 +50,7 @@ draws its figures with plotly.js, loaded from the internet.
 | `data_check_table` | per submission: creation date, `destest check` status, closeness grade, errors and warnings (short) | `closeness` |
 | `kpi_table` | KPI values, one column per submission, with deviation and the closeness grade | `kpis`, `deviation`, `closeness`, `warn_pct`, `bad_pct` |
 | `metadata_table` | metadata side by side (`sections: all` for the whole file) | `sections` |
-| `closeness_bar` | closeness grade of all submissions, best first; the shown ones in colour | – |
+| `closeness_bar` | closeness grade, best first; the shown ones in colour, others grey | `colors` (`submission`, `rank`), `submissions` (`all`, `selected`: only the shown ones, rank among all) |
 | `contributions_map` | world map at the institutions' cities; a menu colours by a metadata field | `color_by` |
 | `deviation_heatmap` | submissions × KPIs, coloured by a metric | `kpis`, `metric`, `limit` |
 | `kpi_bar` | one bar chart per KPI | `kpis`, `show_reference` |
@@ -81,8 +81,21 @@ add the city to that file when a new institution joins.
 ## In a CME spec file
 
 ```yaml
+cme:
+  # ... series, exercise_number, full_title, description_reference, status
+  description: >-                    # what the exercise tests, a few sentences
+    Checks that the fundamental equations for pressure drop and heat loss ...
+  characteristics:                   # label: value, shown in this order
+    Simulation: Steady state (constant boundary conditions)
+    Heat source: Ideal source at node i, constant supply temperature 70 °C
+
 analysis:
-  reference: median
+  reference: median                  # median | mean of all valid submissions
+  reference_note: >-                 # optional: why this reference
+    There is no measured or analytical truth for this exercise ...
+  comments_and_observations:         # optional: bullets, last card of the overview
+    - Comment 1
+    - Observation 1
   kpis:
     - key: Q_loss_supply_i_h          # used by the visuals
       label: Heat loss supply i-h
@@ -100,6 +113,10 @@ analysis:
     detail: [...]
     comparison: [...]
 ```
+
+`description`, `characteristics` and the reference (method, number of submissions and
+`reference_note`) are shown in a card at the top of every dashboard, below the exercise
+selection, and in the header of the HTML pages.
 
 Everything is checked when the spec file is loaded (`uv run destest specs`): an unknown
 KPI function, visual, parameter or option, or a KPI or column key that does not exist,

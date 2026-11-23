@@ -64,6 +64,12 @@ def test_cme_dhn_1_content() -> None:
     assert spec.result_data.rows.max == 10
     assert spec.cme.full_title == "Steady-state simulation of a district heating network"
     assert spec.result_metadata.model_details[0].key == "pipe_model"
+    assert spec.cme.description.startswith("Checks that the fundamental equations")
+    assert next(iter(spec.cme.characteristics)) == "Simulation"
+    assert spec.analysis is not None
+    assert spec.analysis.reference == "median"
+    assert spec.analysis.reference_note
+    assert spec.analysis.comments_and_observations[0] == "Comment 1"
 
 
 def test_result_metadata_layout_loads() -> None:

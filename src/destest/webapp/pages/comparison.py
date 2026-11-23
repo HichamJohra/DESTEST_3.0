@@ -5,8 +5,16 @@ from typing import Any
 import dash
 from dash import Input, Output, State, callback, dcc, html
 
-from ..components import PERSIST, card, control, message, page_head, render_dashboard
-from ..data import dashboard, submission_options
+from ..components import (
+    PERSIST,
+    card,
+    cme_info_card,
+    control,
+    message,
+    page_head,
+    render_dashboard,
+)
+from ..data import dashboard, get_cme, submission_options
 from .overview import cme_dropdown
 
 #: Submissions selected when a comparison is opened for the first time.
@@ -61,10 +69,14 @@ def _submissions(
 
 @callback(Output("cmp-content", "children"), Input("cmp-cme", "value"), Input("cmp-subs", "value"))
 def _comparison(cme: str | None, ids: list[str] | None) -> list[Any]:
-    if not cme or not ids:
+    if not cme:
         return [message("Choose an exercise and at least one submission.", "info")]
+    data = get_cme(cme)
+    info = cme_info_card(data.spec, len(data.submissions))
+    if not ids:
+        return [info, message("Choose at least one submission.", "info")]
     try:
         board = dashboard(cme, "comparison", ids)
     except ValueError as exc:
-        return [message(str(exc), "error")]
-    return render_dashboard(board)
+        return [info, message(str(exc), "error")]
+    return [info, *render_dashboard(board)]

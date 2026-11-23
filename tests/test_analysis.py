@@ -212,6 +212,33 @@ def test_submission_table_has_dates_issues_and_closeness(subs: list[Submission])
     assert table.color(table.rows.index(best), 4) == rank_color(1, 7) == "#8fd19e"
 
 
+@needs_results
+def test_closeness_bar_ranks_best_first(subs: list[Submission]) -> None:
+    ctx = build_context(SPEC, subs)
+    fig = VISUALS["closeness_bar"].builder(ctx, colors="rank")
+    assert isinstance(fig, dict)
+    bar = fig["data"][0]
+    assert bar["y"] == sorted(bar["y"], reverse=True)
+    assert bar["marker"]["color"][0] == rank_color(1, 7)
+    assert bar["marker"]["color"][-1] == rank_color(7, 7)
+    assert bar["x"][0].startswith("Modelica Buildings<br>M. Frandsen")
+
+
+@needs_results
+def test_closeness_bar_selected_keeps_the_overall_rank(subs: list[Submission]) -> None:
+    ctx = build_context(SPEC, subs, [subs[0], subs[1]])
+    fig = VISUALS["closeness_bar"].builder(ctx, colors="rank", submissions="selected")
+    assert isinstance(fig, dict)
+    bar = fig["data"][0]
+    assert len(bar["x"]) == 2
+    ranks = [int(r.split()[1]) for r in bar["customdata"]]
+    assert ranks == sorted(ranks)
+    assert all(r.endswith("of 7") for r in bar["customdata"])
+    assert bar["marker"]["color"] == [rank_color(r, 7) for r in ranks]
+    with pytest.raises(ValueError, match="submissions must be"):
+        VISUALS["closeness_bar"].builder(ctx, submissions="some")
+
+
 def test_rank_colors_go_from_green_to_pale_red() -> None:
     colors = [rank_color(r, 4) for r in range(1, 5)]
     assert colors[0] == "#8fd19e"
@@ -307,6 +334,7 @@ def test_dashboards_of_cme_dhn_1(subs: list[Submission]) -> None:
     page = render_html(comparison)
     assert page.startswith("<!DOCTYPE html>")
     assert "Plotly.newPlot" in page
+    assert "Reference: Median of all valid submissions (currently 7)" in page
     json.dumps(comparison.to_dict())
 
 
@@ -334,6 +362,11 @@ def test_cli_dashboard(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> No
 
 
 # ---- the analysis section of a spec file is checked on load ----------------------------------------
+def panel(analysis: dict[str, Any], dashboard: str, visual: str) -> dict[str, Any]:
+    """The first panel of a dashboard with this visual (by name, so adding panels is safe)."""
+    return next(p for p in analysis["dashboards"][dashboard] if p["visual"] == visual)
+
+
 @pytest.mark.parametrize(
     ("change", "expected"),
     [
@@ -341,19 +374,20 @@ def test_cli_dashboard(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> No
         (lambda a: a["kpis"][0].update(params={"last": 2}), "has no parameter last"),
         (lambda a: a["kpis"][0].update(column="T_x"), "'T_x' is not a column"),
         (lambda a: a["kpis"].append(dict(a["kpis"][0])), "key used more than once"),
-        (lambda a: a["dashboards"]["overview"][1].update(visual="pie"), "unknown 'pie'"),
         (
-            lambda a: a["dashboards"]["overview"][1]["options"].update(colour="red"),
+            lambda a: panel(a, "overview", "contributions_map").update(visual="pie"),
+            "unknown 'pie'",
+        ),
+        (
+            lambda a: panel(a, "overview", "contributions_map")["options"].update(colour="red"),
             "has no option colour",
         ),
         (
-            lambda a: a["dashboards"]["overview"][3]["options"].update(kpis=["Q_los"]),
+            lambda a: panel(a, "overview", "deviation_heatmap")["options"].update(kpis=["Q_los"]),
             "not a KPI key: Q_los",
         ),
         (
-            lambda a: next(p for p in a["dashboards"]["detail"] if p["visual"] == "time_series")[
-                "options"
-            ].update(columns=["T_x"]),
+            lambda a: panel(a, "detail", "time_series")["options"].update(columns=["T_x"]),
             "not a column key: T_x",
         ),
     ],
