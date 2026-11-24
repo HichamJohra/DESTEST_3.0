@@ -300,7 +300,8 @@ result_metadata:
 #             integral; `params` passes its keyword parameters
 #   visual    a table or figure from destest/analysis/visuals.py, e.g. kpi_table,
 #             deviation_heatmap, kpi_bar, profile, time_series, carpet,
-#             metadata_table, data_check_table, closeness_bar, contributions_map;
+#             metadata_table, data_check_table, closeness_bar, contributions_map,
+#             contributions_timeline, contributions_pie;
 #             `options` are its keyword options
 # Checked on load: unknown functions, visuals, options or keys are errors.
 analysis:
@@ -439,19 +440,32 @@ analysis:
           colors: rank
 
       - visual: data_check_table
-        title: Submissions
-        description: Creation date, result of `destest check` and closeness to the reference.
+        title: Contributions
+        options:
+          first_column: Contributions
 
       - visual: contributions_map
-        title: Where the contributions come from
-        description: Placed at the institution's city; the menu colours them by a metadata field.
+        title: Mapping contributions
         options:
-          color_by:
+          color_by:                  # one option each in the "Colour by" switch
             - modelling_tool.name
             - modeller.institution
-            - modeller.institution_country
-            - modelling_tool.licence
-            - model_details.pipe_model
+
+      - visual: contributions_timeline
+        title: Contributions over time
+        options:
+          color_by:                  # one option each in the "Colour by" switch
+            - tool
+            - institution
+            - country
+
+      - visual: contributions_pie
+        title: Distribution of contributions
+        options:
+          color_by:                  # one option each in the "Colour by" switch
+            - tool
+            - institution
+            - country
 
       - visual: kpi_table
         title: Key performance indicators

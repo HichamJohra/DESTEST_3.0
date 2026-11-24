@@ -51,7 +51,9 @@ draws its figures with plotly.js, loaded from the internet.
 | `kpi_table` | KPI values, one column per submission, with deviation and the closeness grade | `kpis`, `deviation`, `closeness`, `warn_pct`, `bad_pct` |
 | `metadata_table` | metadata side by side (`sections: all` for the whole file) | `sections` |
 | `closeness_bar` | closeness grade, best first; the shown ones in colour, others grey | `colors` (`submission`, `rank`), `submissions` (`all`, `selected`: only the shown ones, rank among all) |
-| `contributions_map` | world map at the institutions' cities; a menu colours by a metadata field | `color_by` |
+| `contributions_map` | map at the institutions' cities; a "Colour by" switch picks the metadata field (one map each) | `color_by` |
+| `contributions_pie` | share of the submissions per tool, institution or country (donut); several `color_by` give a switch | `color_by` (list of `tool`, `institution`, `country`, `cme`), `height` |
+| `contributions_timeline` | submissions per month, one square each, up to the current month (scrolls, opens at today); several `color_by` give a switch | `color_by` (list of `tool`, `institution`, `country`, `cme`), `min_months` |
 | `deviation_heatmap` | submissions × KPIs, coloured by a metric | `kpis`, `metric`, `limit` |
 | `kpi_bar` | one bar chart per KPI | `kpis`, `show_reference` |
 | `profile` | several KPIs along an axis, e.g. temperatures along the network | `kpis`, `x_labels`, `y_title` |

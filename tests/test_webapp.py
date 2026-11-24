@@ -121,6 +121,46 @@ def test_cme_info_card_comes_first(app: Any) -> None:
 
 
 @needs_results
+def test_home_map_and_timeline_toggles(app: Any) -> None:
+    from destest.webapp.pages import home
+
+    assert home._map("tool")["layout"]["legend"]["title"]["text"] == "Modelling tool"
+    assert home._map("cme")["data"][0]["name"] == "CME_DHN_1"
+    by_cme, by_tool = str(home._timeline("cme")), str(home._timeline("tool"))
+    assert "timeline-scroll" in by_cme
+    assert "tl-cell" in by_cme
+    assert "CME_DHN_1" in by_cme
+    assert "TRNSYS" in by_tool
+
+
+@needs_results
+def test_overview_map_switch_and_timeline(app: Any) -> None:
+    from destest.webapp.pages import overview
+
+    text = str(overview._overview("CME_DHN_1"))
+    assert "Mapping contributions" in text
+    assert "choice-switch" in text
+    assert "Contributions over time" in text
+    assert "timeline-scroll" in text
+    assert "choice-html-switch" in text
+    assert "Institution" in text
+    assert "Country" in text
+    assert "Distribution of contributions" in text
+
+
+@needs_results
+def test_home_switch_options(app: Any) -> None:
+    from destest.webapp.pages import home
+
+    assert list(home.MAP_OPTIONS) == ["cme", "tool", "institution"]
+    assert "AAU" in str(home._timeline("institution"))
+    assert home._map("institution")["layout"]["legend"]["title"]["text"] == "Institution"
+    pie = home._pie("tool")["data"][0]
+    assert pie["type"] == "pie"
+    assert sum(pie["values"]) == 7
+
+
+@needs_results
 def test_comments_card_ends_the_overview(app: Any) -> None:
     from destest.webapp.pages import overview
 

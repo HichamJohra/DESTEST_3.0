@@ -21,8 +21,18 @@ from ..check import check_submission_files
 from ..filename_check.validate import check_name, partner_names
 from ..result import Issue
 from ..results import Submission
+from .colors import category_colors
 from .context import REFERENCE_COLOR, AnalysisContext
-from .maps import MapPoint, category_map, hover_text, locate, meta_value, spread
+from .maps import (
+    MapPoint,
+    category_map,
+    contributions_pie,
+    hover_text,
+    locate,
+    meta_value,
+    spread,
+)
+from .timeline import Timeline, submission_timeline
 
 Figure = dict[str, Any]
 
@@ -66,7 +76,27 @@ class Table:
         return asdict(self)
 
 
-Builder = Callable[..., Table | Figure]
+@dataclass
+class Choice:
+    """Several versions of one visual; the viewer picks one (e.g. the colouring).
+
+    `options`: option label -> figure or timeline, the first shown by default.
+    """
+
+    label: str
+    options: dict[str, Figure | Timeline]
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready form."""
+        return {
+            "label": self.label,
+            "options": {
+                k: v.to_dict() if isinstance(v, Timeline) else v for k, v in self.options.items()
+            },
+        }
+
+
+Builder = Callable[..., Table | Figure | Choice | Timeline]
 
 
 @dataclass(frozen=True)
@@ -297,11 +327,13 @@ def _issue_lines(reports: list[tuple[str, list[Issue]]]) -> str:
 
 
 @visual("data_check_table")
-def data_check_table(ctx: AnalysisContext, *, closeness: bool = True) -> Table:
+def data_check_table(
+    ctx: AnalysisContext, *, closeness: bool = True, first_column: str = "Submission"
+) -> Table:
     """One row per submission: creation date (from the file name), `destest check` result
     of the data and metadata files, the closeness grade coloured by rank, and the errors
-    and warnings, one per line."""
-    headers = ["Submission", "Created", "Data file", "Metadata file"]
+    and warnings, one per line. `first_column`: header of the submission column."""
+    headers = [first_column, "Created", "Data file", "Metadata file"]
     headers += [CLOSENESS_LABEL] if closeness else []
     headers += ["Errors", "Warnings"]
     align = ["left", "center", "center", "center"]
@@ -648,6 +680,24 @@ MAP_COLOR_BY = (
     "modelling_tool.licence",
 )
 
+#: Labels of the colour fields in the map's switch (others: from the key).
+MAP_FIELD_LABELS = {
+    "modelling_tool.name": "Modelling tool",
+    "modeller.institution": "Institution",
+    "modeller.institution_country": "Country",
+    "modelling_tool.licence": "Licence",
+}
+
+
+def field_label(path: str) -> str:
+    """Short label of a metadata field in the colour switch.
+
+    >>> field_label("modelling_tool.name"), field_label("model_details.pipe_model")
+    ('Modelling tool', 'Pipe model')
+    """
+    known = MAP_FIELD_LABELS.get(path)
+    return known or path.rpartition(".")[2].replace("_", " ").capitalize()
+
 
 @visual("contributions_map")
 def contributions_map(
@@ -655,11 +705,12 @@ def contributions_map(
     *,
     color_by: list[str] | None = None,
     height: int = 560,
-) -> Figure:
+) -> Choice:
     """Map of the submissions at their institution's city (see `destest.analysis.maps`).
 
-    The menu colours the markers by a metadata field (`color_by`, as `section.key`).
-    A submission whose city and country are unknown is counted under the map.
+    One map per colour field (`color_by`, metadata fields as `section.key`); the viewer
+    switches between them. Values have the same colours as on the home page and in the
+    timeline. A submission whose city and country are unknown is counted under the map.
     """
     fields = list(color_by or MAP_COLOR_BY)
     points: list[MapPoint] = []
@@ -673,4 +724,65 @@ def contributions_map(
         points.append(MapPoint(*where, hover, {f: meta_value(s, f) for f in fields}))
     spread(points)
     note = f"Not placed (city/country unknown): {missing}" if missing else ""
-    return category_map(points, fields, height=height, note=note)
+    figures: dict[str, Figure | Timeline] = {}
+    for f in fields:
+        label = field_label(f)
+        colors = category_colors(p.categories[f] for p in points)
+        fig = category_map(points, [f], height=height, note=note, colors=colors)
+        fig["layout"]["legend"]["title"]["text"] = label
+        figures[label] = fig
+    return Choice("Colour by", figures)
+
+
+#: Labels of the timeline's colour options.
+TIMELINE_LABELS = {
+    "cme": "Exercise",
+    "tool": "Modelling tool",
+    "institution": "Institution",
+    "country": "Country",
+}
+
+
+@visual("contributions_timeline")
+def contributions_timeline(
+    ctx: AnalysisContext, *, color_by: list[str] | None = None, min_months: int = 24
+) -> Timeline | Choice:
+    """Submissions of the CME per month (one square each), up to the current month.
+
+    `color_by`: `tool`, `institution`, `country` or `cme`; with several, a switch picks
+    one (default: tool, institution and country).
+    """
+    keys = list(color_by or ["tool", "institution", "country"])
+    subs = {ctx.spec.folder_name: ctx.focus}
+    versions: dict[str, Figure | Timeline] = {
+        TIMELINE_LABELS.get(k, k): submission_timeline(subs, min_months=min_months, color_by=k)
+        for k in keys
+    }
+    if len(versions) == 1:
+        only = next(iter(versions.values()))
+        assert isinstance(only, Timeline)
+        return only
+    return Choice("Colour by", versions)
+
+
+@visual("contributions_pie")
+def contributions_share(
+    ctx: AnalysisContext, *, color_by: list[str] | None = None, height: int = 420
+) -> Figure | Choice:
+    """Share of the CME's submissions per modelling tool, institution or country (donut).
+
+    `color_by`: `tool`, `institution`, `country` (or `cme`); with several, a switch
+    picks one (default: tool, institution and country). Colours as on the map.
+    """
+    keys = list(color_by or ["tool", "institution", "country"])
+    subs = {ctx.spec.folder_name: ctx.focus}
+    versions: dict[str, Figure | Timeline] = {}
+    for k in keys:
+        fig = contributions_pie(subs, color_by=k, height=height)
+        fig["layout"]["legend"]["title"]["text"] = TIMELINE_LABELS.get(k, k)
+        versions[TIMELINE_LABELS.get(k, k)] = fig
+    if len(versions) == 1:
+        only = next(iter(versions.values()))
+        assert isinstance(only, dict)
+        return only
+    return Choice("Colour by", versions)

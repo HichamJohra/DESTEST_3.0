@@ -34,6 +34,9 @@ DESTEST_3.0/
 │       │   ├── accuracy_metric.py  accuracy vs the reference, e.g. relative_deviation, nmbe
 │       │   ├── context.py      KPIs of every submission + reference, computed once
 │       │   ├── visuals.py      tables and figures, e.g. kpi_table, profile, carpet
+│       │   ├── maps.py         maps of the contributions (Carto tiles)
+│       │   ├── colors.py       colours by CME (series shades) and by modelling tool
+│       │   ├── timeline.py     submissions per month (home-page timeline)
 │       │   └── dashboard.py    the dashboards of a CME, as JSON or an HTML page
 │       ├── results.py        load the submissions of a CME (time series + metadata)
 │       ├── check.py          `destest check`: names, pairing and content in one go

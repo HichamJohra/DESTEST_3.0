@@ -20,7 +20,8 @@ from typing import Any, Literal
 from ..results import Submission
 from ..specs.schema import CmeSpec
 from .context import build_context, describe_reference
-from .visuals import VISUALS, Figure, Table
+from .timeline import Timeline
+from .visuals import VISUALS, Choice, Figure, Table
 
 Kind = Literal["overview", "detail", "comparison"]
 KINDS: tuple[str, ...] = ("overview", "detail", "comparison")
@@ -38,6 +39,8 @@ class Panel:
     description: str = ""
     table: Table | None = None
     figure: Figure | None = None
+    choice: Choice | None = None  # several figures, the viewer picks one
+    timeline: Timeline | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-ready form."""
@@ -47,6 +50,8 @@ class Panel:
             "description": self.description,
             "table": self.table.to_dict() if self.table else None,
             "figure": self.figure,
+            "choice": self.choice.to_dict() if self.choice else None,
+            "timeline": self.timeline.to_dict() if self.timeline else None,
         }
 
 
@@ -109,6 +114,10 @@ def build_dashboard(
         panel = Panel(p.title, p.visual, p.description)
         if isinstance(result, Table):
             panel.table = result
+        elif isinstance(result, Choice):
+            panel.choice = result
+        elif isinstance(result, Timeline):
+            panel.timeline = result
         else:
             panel.figure = result
         board.panels.append(panel)
@@ -137,6 +146,14 @@ td.warn { background: #fff4d6; }
 td.bad { background: #ffd9d6; }
 td.score { font-weight: 600; background: #eef6ee; }
 td.wrap { white-space: normal; text-align: left; min-width: 220px; max-width: 520px; }
+.tl-scroll { overflow-x: auto; direction: rtl; }
+.tl { direction: ltr; display: inline-flex; gap: 3px; align-items: flex-end; }
+.tl-col, .tl-stack { display: flex; flex-direction: column; gap: 3px; width: 14px; }
+.tl-cell { width: 14px; height: 14px; border-radius: 3px; }
+.tl-empty { background: #ebedf0; }
+.tl-label { height: 16px; font-size: .72rem; color: #666; white-space: nowrap; }
+.tl-key { margin-right: 12px; } .tl-key i { display: inline-block; width: 10px; height: 10px;
+          border-radius: 2px; margin-right: 4px; }
 """
 
 
@@ -164,14 +181,55 @@ def _table_html(t: Table) -> str:
     return f'<div class="scroll"><table{width}><tr>{head}</tr>{rows}</table></div>{note}'
 
 
+def _timeline_html(t: Timeline) -> str:
+    """The timeline as a grid of month columns (opens scrolled to the current month)."""
+    colors = t.colors()
+    height = max(6, t.height)
+    cols = []
+    for m in t.months:
+        cells = []
+        for k in range(height):
+            if k < len(m.cells):
+                c = m.cells[k]
+                tip = html.escape(f"{c.cme} - {c.label} - {c.created:%Y-%m-%d}")
+                style = f"background:{colors[t.key(c)]}"
+                cells.append(f'<div class="tl-cell" title="{tip}" style="{style}"></div>')
+            else:
+                cells.append('<div class="tl-cell tl-empty"></div>')
+        label = str(m.year) if m.month == 1 or m is t.months[0] else ""
+        cols.append(
+            f'<div class="tl-col" title="{m.name}: {len(m.cells)}">'
+            f'<div class="tl-stack">{"".join(reversed(cells))}</div>'
+            f'<div class="tl-label">{label}</div></div>'
+        )
+    legend = " ".join(
+        f'<span class="tl-key"><i style="background:{v}"></i>{html.escape(k)}</span>'
+        for k, v in colors.items()
+    )
+    return (
+        f'<div class="tl-scroll"><div class="tl">{"".join(cols)}</div></div>'
+        f'<p class="note">{legend}</p>'
+    )
+
+
 def render_html(board: Dashboard) -> str:
     """A stand-alone HTML page of the dashboard (needs internet for plotly.js)."""
     parts = []
-    figures = []
+    figures: list[tuple[str, Figure | None]] = []
     for i, p in enumerate(board.panels):
         desc = f'<p class="desc">{html.escape(p.description)}</p>' if p.description else ""
         if p.table is not None:
             content = _table_html(p.table)
+        elif p.timeline is not None:
+            content = _timeline_html(p.timeline)
+        elif p.choice is not None:  # static page: the first option (e.g. map by tool)
+            first, option = next(iter(p.choice.options.items()))
+            content = f'<p class="desc">{p.choice.label}: {html.escape(first)}</p>'
+            if isinstance(option, Timeline):
+                content += _timeline_html(option)
+            else:
+                content += f'<div id="fig{i}"></div>'
+                figures.append((f"fig{i}", option))
         else:
             content = f'<div id="fig{i}"></div>'
             figures.append((f"fig{i}", p.figure))

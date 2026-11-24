@@ -6,7 +6,10 @@ Submissions are placed at their institution's city (`modeller.institution_city`,
 Maps use map tiles (Carto Positron, no key needed) and fit the view to the points.
 
 * `category_map`: markers coloured by a category; a menu switches between fields;
-* `exercises_map`: all submissions of several CMEs, coloured by CME (home page).
+* `exercises_map`: all submissions of several CMEs, coloured by CME or by modelling
+  tool (home page; colours from `colors.py`);
+* `contributions_pie`: the share of the submissions per CME, tool, institution or
+  country (home page, same colours).
 """
 
 import math
@@ -15,6 +18,7 @@ from typing import Any
 
 from ..results import Submission
 from ..specs import load_locations
+from .colors import category_colors, category_of, cme_colors, cme_order
 from .context import PALETTE
 
 Figure = dict[str, Any]
@@ -105,15 +109,24 @@ def category_map(
     fields: list[str],
     height: int = 560,
     note: str = "",
+    colors: dict[str, str] | None = None,
+    order: list[str] | None = None,
 ) -> Figure:
-    """Markers coloured by category. With several `fields`, a menu chooses the one shown."""
+    """Markers coloured by category. With several `fields`, a menu chooses the one shown.
+
+    `colors`: category -> colour (default: the palette in turn); `order`: legend order
+    of the categories (default: alphabetical).
+    """
     data: list[dict[str, Any]] = []
     owners: list[int] = []  # field index of each trace
     for f_i, name in enumerate(fields):
         groups: dict[str, list[MapPoint]] = {}
         for p in points:
             groups.setdefault(p.categories.get(name, "-"), []).append(p)
-        for c_i, (category, members) in enumerate(sorted(groups.items())):
+        rank = {c: i for i, c in enumerate(order or [])}
+        ordered = sorted(groups.items(), key=lambda g: (rank.get(g[0], len(rank)), g[0]))
+        for c_i, (category, members) in enumerate(ordered):
+            color = (colors or {}).get(category, PALETTE[c_i % len(PALETTE)])
             data.append(
                 {
                     "type": "scattermap",
@@ -122,7 +135,7 @@ def category_map(
                     "mode": "markers",
                     "name": category,
                     "visible": f_i == 0,
-                    "marker": {"size": 14, "color": PALETTE[c_i % len(PALETTE)], "opacity": 0.9},
+                    "marker": {"size": 14, "color": color, "opacity": 0.9},
                     "hovertext": [p.hover for p in members],
                     "hovertemplate": "%{hovertext}<extra></extra>",
                 }
@@ -210,8 +223,25 @@ def hover_text(sub: Submission, *lines: str) -> str:
     return "<br>".join([*head, *lines])
 
 
-def exercises_map(cmes: dict[str, list[Submission]], height: int = 480) -> Figure:
-    """All submissions of several CMEs, coloured by CME (for the home page)."""
+#: Colour choices of the home-page map and timeline: value -> label.
+COLOR_BY = {
+    "cme": "Exercise",
+    "tool": "Modelling tool",
+    "institution": "Institution",
+    "country": "Country",
+}
+
+
+def exercises_map(
+    cmes: dict[str, list[Submission]], height: int = 480, color_by: str = "cme"
+) -> Figure:
+    """All submissions of several CMEs, coloured by CME, tool, institution or country.
+
+    By CME, the exercises of a series share a colour family, lighter for lower numbers.
+    """
+    if color_by not in COLOR_BY:
+        raise ValueError(f"color_by must be one of {', '.join(COLOR_BY)} (got '{color_by}')")
+    field_name = COLOR_BY[color_by]
     points: list[MapPoint] = []
     missing: list[str] = []
     for name, subs in cmes.items():
@@ -220,7 +250,73 @@ def exercises_map(cmes: dict[str, list[Submission]], height: int = 480) -> Figur
             if where is None:
                 missing.append(s.label)
                 continue
-            points.append(MapPoint(*where, hover_text(s, f"Exercise: {name}"), {"Exercise": name}))
+            category = name if color_by == "cme" else category_of(s, color_by)
+            hover = hover_text(s, f"Exercise: {name}", f"Tool: {category_of(s, 'tool')}")
+            points.append(MapPoint(*where, hover, {field_name: category}))
     spread(points)
+    if color_by == "cme":
+        colors = cme_colors(cmes)
+        order = sorted(cmes, key=cme_order)
+    else:
+        colors = category_colors(category_of(s, color_by) for subs in cmes.values() for s in subs)
+        order = list(colors)
     note = f"Not placed (city unknown): {len(missing)}" if missing else ""
-    return category_map(points, ["Exercise"], height=height, note=note)
+    return category_map(points, [field_name], height=height, note=note, colors=colors, order=order)
+
+
+def contributions_pie(
+    cmes: dict[str, list[Submission]], color_by: str = "cme", height: int = 420
+) -> Figure:
+    """Share of the submissions per CME, modelling tool, institution or country (a donut).
+
+    Colours as on the map and the timeline.
+    """
+    if color_by not in COLOR_BY:
+        raise ValueError(f"color_by must be one of {', '.join(COLOR_BY)} (got '{color_by}')")
+    counts: dict[str, int] = {}
+    for name, subs in cmes.items():
+        for s in subs:
+            key = name if color_by == "cme" else category_of(s, color_by)
+            counts[key] = counts.get(key, 0) + 1
+    if color_by == "cme":
+        colors = cme_colors(counts)
+        order = sorted(counts, key=cme_order)
+    else:
+        colors = category_colors(counts)
+        order = list(colors)
+    return {
+        "data": [
+            {
+                "type": "pie",
+                "labels": order,
+                "values": [counts[k] for k in order],
+                "marker": {
+                    "colors": [colors[k] for k in order],
+                    "line": {"color": "#ffffff", "width": 2},
+                },
+                "hole": 0.45,
+                "sort": False,
+                "direction": "clockwise",
+                "textinfo": "label+value",
+                "textposition": "outside",
+                "hovertemplate": "%{label}<br>%{value} submission(s) (%{percent})<extra></extra>",
+            }
+        ],
+        "layout": {
+            "height": height,
+            "margin": {"l": 20, "r": 20, "t": 30, "b": 30},
+            "showlegend": True,
+            "legend": {"title": {"text": COLOR_BY[color_by]}},
+            "annotations": [
+                {
+                    "text": f"{sum(counts.values())}<br>submissions",
+                    "x": 0.5,
+                    "y": 0.5,
+                    "xref": "paper",
+                    "yref": "paper",
+                    "showarrow": False,
+                    "font": {"size": 14, "color": "#5d6675"},
+                }
+            ],
+        },
+    }

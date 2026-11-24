@@ -14,7 +14,7 @@ uv run destest web --debug --results "Result data"
 
 | Page | Path | Shows |
 |---|---|---|
-| Home | `/` | the exercises (CMEs) with a dashboard, their number of submissions, links |
+| Home | `/` | map of the contributions, submissions per month (timeline), their distribution (pie), the exercises (CMEs) with links |
 | Overview | `/overview?cme=CME_DHN_1` | dashboard `overview` of the CME: all submissions |
 | Detail | `/detail?cme=CME_DHN_1&submission=<id>` | dashboard `detail`: one submission |
 | Comparison | `/comparison?cme=CME_DHN_1` | dashboard `comparison`: a selection of submissions |
@@ -33,6 +33,14 @@ Below the exercise selection, every dashboard page first shows a card describing
 (`cme.description`, `cme.characteristics`) and how its reference is built (`analysis.reference`,
 `analysis.reference_note`), all taken from the spec file. The overview page ends with a
 "Comments and observations" card listing `analysis.comments_and_observations` (if any).
+
+On the home page, the map and the timeline each have a "Colour by" switch: by exercise
+(each series one colour family, e.g. DHN blue and DCN green, lighter for lower exercise
+numbers; `analysis/colors.py`), modelling tool or institution, and for the timeline also
+country. A tool, institution or country has the same colour on every map and timeline.
+The timeline has one column per month up to the current one, and opens scrolled to the
+right. On the overview page, the map and the timeline of the selected CME have their own
+switches (options from the CME spec file).
 
 ## Structure
 

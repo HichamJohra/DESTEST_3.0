@@ -1,6 +1,7 @@
 """Tests for destest.results and destest.analysis (KPIs, metrics, visuals, dashboards)."""
 
 import json
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -22,8 +23,10 @@ from destest.analysis.accuracy_metric import (
     closeness_scores,
     reference_series,
 )
-from destest.analysis.maps import exercises_map
-from destest.analysis.visuals import rank_color
+from destest.analysis.colors import cme_colors, tool_colors
+from destest.analysis.maps import contributions_pie, exercises_map
+from destest.analysis.timeline import Timeline, submission_timeline
+from destest.analysis.visuals import Choice, rank_color
 from destest.cli import main
 from destest.results import Submission, load_cme_submissions, load_submission
 from destest.specs import (
@@ -145,10 +148,17 @@ def test_every_visual_builds_and_is_json(subs: list[Submission], name: str) -> N
     if isinstance(result, Table):
         assert result.rows
         assert all(len(r) == len(result.headers) for r in result.rows)
+    elif isinstance(result, Choice):
+        assert result.options
+        for option in result.options.values():
+            assert isinstance(option, Timeline) or (option["data"] and "layout" in option)
+    elif isinstance(result, Timeline):
+        assert result.months
+        assert result.cells
     else:
         assert result["data"]
         assert "layout" in result
-    json.dumps(result.to_dict() if isinstance(result, Table) else result)
+    json.dumps(result.to_dict() if isinstance(result, Table | Choice | Timeline) else result)
 
 
 @needs_results
@@ -186,6 +196,9 @@ def test_closeness_of_cme_dhn_1(subs: list[Submission]) -> None:
 
 @needs_results
 def test_submission_table_has_dates_issues_and_closeness(subs: list[Submission]) -> None:
+    renamed = VISUALS["data_check_table"].builder(build_context(SPEC, subs), first_column="X")
+    assert isinstance(renamed, Table)
+    assert renamed.headers[0] == "X"
     table = VISUALS["data_check_table"].builder(build_context(SPEC, subs))
     assert isinstance(table, Table)
     assert table.headers == [
@@ -270,6 +283,67 @@ def test_exercises_map_colours_by_cme(subs: list[Submission]) -> None:
 
 
 @needs_results
+def test_exercises_map_series_shades_and_tools(subs: list[Submission]) -> None:
+    fig = exercises_map({"CME_DHN_2": subs[:1], "CME_DHN_1": subs, "CME_DCN_1": subs[:1]})
+    colors = {t["name"]: t["marker"]["color"] for t in fig["data"]}
+    assert list(colors) == ["CME_DCN_1", "CME_DHN_1", "CME_DHN_2"]  # series, then number
+    assert colors == cme_colors(colors)
+    by_tool = exercises_map({"CME_DHN_1": subs}, color_by="tool")
+    names = [t["name"] for t in by_tool["data"]]
+    assert {"Modelica", "TRNSYS"} <= set(names)
+    assert by_tool["layout"]["legend"]["title"]["text"] == "Modelling tool"
+    with pytest.raises(ValueError, match="color_by"):
+        exercises_map({"CME_DHN_1": subs}, color_by="city")
+
+
+@needs_results
+def test_contributions_pie_counts_and_colours(subs: list[Submission]) -> None:
+    pie = contributions_pie({"CME_DHN_1": subs, "CME_DHN_2": subs[:2]})["data"][0]
+    assert pie["labels"] == ["CME_DHN_1", "CME_DHN_2"]
+    assert pie["values"] == [7, 2]
+    assert pie["marker"]["colors"] == list(cme_colors(["CME_DHN_1", "CME_DHN_2"]).values())
+    by_tool = contributions_pie({"CME_DHN_1": subs}, color_by="tool")["data"][0]
+    assert dict(zip(by_tool["labels"], by_tool["values"], strict=True))["Modelica"] == 3
+    country = contributions_pie({"CME_DHN_1": subs}, color_by="country")
+    assert country["layout"]["legend"]["title"]["text"] == "Country"
+
+
+@needs_results
+def test_contributions_pie_visual_of_one_cme(subs: list[Submission]) -> None:
+    choice = VISUALS["contributions_pie"].builder(build_context(SPEC, subs))
+    assert isinstance(choice, Choice)
+    assert list(choice.options) == ["Modelling tool", "Institution", "Country"]  # no Exercise
+    by_tool = choice.options["Modelling tool"]
+    assert isinstance(by_tool, dict)
+    assert sum(by_tool["data"][0]["values"]) == 7
+    one = VISUALS["contributions_pie"].builder(build_context(SPEC, subs), color_by=["country"])
+    assert isinstance(one, dict)  # a single option: a plain figure, no switch
+
+
+def test_cme_colors_light_to_dark_per_series() -> None:
+    c = cme_colors(["CME_DHN_3", "CME_DHN_1", "CME_DHN_2", "CME_XYZ_1"])
+    lightness = [sum(int(c[n][i : i + 2], 16) for i in (1, 3, 5)) for n in sorted(c)[:3]]
+    assert lightness == sorted(lightness, reverse=True)  # DHN_1 lightest, DHN_3 darkest
+    assert list(c.values()).count(c["CME_XYZ_1"]) == 1  # unknown series: its own colour
+
+
+@needs_results
+def test_submission_timeline_months_up_to_today(subs: list[Submission]) -> None:
+    tl = submission_timeline({"CME_DHN_1": subs}, today=date(2026, 11, 24))
+    first, last = tl.months[0], tl.months[-1]
+    assert (first.year, first.month) == (2021, 1)  # oldest submission (TRNSYS 2021)
+    assert (last.year, last.month) == (2026, 11)  # the current month is the last column
+    assert len(tl.months) == 6 * 12 - 1
+    jan_2022 = next(m for m in tl.months if (m.year, m.month) == (2022, 1))
+    assert len(jan_2022.cells) == 5
+    assert tl.height == 5
+    assert sum(len(m.cells) for m in tl.months) == len(subs)
+    empty = submission_timeline({}, today=date(2026, 11, 24))
+    assert len(empty.months) == 24
+    assert empty.height == 0
+
+
+@needs_results
 def test_metadata_table_all_sections(subs: list[Submission]) -> None:
     table = VISUALS["metadata_table"].builder(build_context(SPEC, subs, [subs[0]]), sections="all")
     assert isinstance(table, Table)
@@ -282,18 +356,56 @@ def test_metadata_table_all_sections(subs: list[Submission]) -> None:
 
 @needs_results
 def test_contributions_map(subs: list[Submission]) -> None:
-    fig = VISUALS["contributions_map"].builder(
+    choice = VISUALS["contributions_map"].builder(
         build_context(SPEC, subs), color_by=["modelling_tool.name", "modeller.institution"]
     )
+    assert isinstance(choice, Choice)
+    assert choice.label == "Colour by"
+    assert list(choice.options) == ["Modelling tool", "Institution"]  # one map per field
+    fig = choice.options["Modelling tool"]
     assert isinstance(fig, dict)
-    visible = [t for t in fig["data"] if t["visible"]]
-    assert sum(len(t["lat"]) for t in visible) == 7  # every submission placed once
-    assert {t["name"] for t in visible} == {"CitySim", "Modelica", "SIM VICUS", "TRNSYS"}
-    menu = fig["layout"]["updatemenus"][0]["buttons"]
-    assert [b["label"] for b in menu] == ["modelling_tool.name", "modeller.institution"]
+    assert sum(len(t["lat"]) for t in fig["data"]) == 7  # every submission placed once
+    assert {t["name"] for t in fig["data"]} == {"CitySim", "Modelica", "SIM VICUS", "TRNSYS"}
+    assert "updatemenus" not in fig["layout"]  # the switch is outside the figure
+    assert fig["layout"]["legend"]["title"]["text"] == "Modelling tool"
+    tools = tool_colors(["CitySim", "Modelica", "SIM VICUS", "TRNSYS"])
+    assert {t["name"]: t["marker"]["color"] for t in fig["data"]} == tools  # as on home page
     # markers sharing a city (3 x TUD in Dresden) are spread apart
-    tud = next(t for t in fig["data"] if t["name"] == "TUD")
+    by_institution = choice.options["Institution"]
+    assert isinstance(by_institution, dict)
+    tud = next(t for t in by_institution["data"] if t["name"] == "TUD")
     assert len(set(zip(tud["lat"], tud["lon"], strict=True))) == 3
+
+
+@needs_results
+def test_contributions_timeline(subs: list[Submission]) -> None:
+    ctx = build_context(SPEC, subs)
+    tl = VISUALS["contributions_timeline"].builder(ctx, color_by=["tool"])
+    assert isinstance(tl, Timeline)  # a single option: no switch
+    assert tl.color_by == "tool"
+    assert len(tl.cells) == 7
+    assert tl.months[-1].year == date.today().year  # ends at the current month
+    assert set(tl.colors()) == {"CitySim", "Modelica", "SIM VICUS", "TRNSYS"}
+    choice = VISUALS["contributions_timeline"].builder(ctx)  # default: tool, institution, country
+    assert isinstance(choice, Choice)
+    assert list(choice.options) == ["Modelling tool", "Institution", "Country"]
+    by_institution = choice.options["Institution"]
+    assert isinstance(by_institution, Timeline)
+    assert set(by_institution.colors()) == {"AAU", "Idiap", "TUD"}
+    # same colours as the map, for the same values
+    map_choice = VISUALS["contributions_map"].builder(ctx, color_by=["modeller.institution"])
+    assert isinstance(map_choice, Choice)
+    map_fig = map_choice.options["Institution"]
+    assert isinstance(map_fig, dict)
+    assert {t["name"]: t["marker"]["color"] for t in map_fig["data"]} == by_institution.colors()
+    overview = build_dashboard(SPEC, subs, "overview")
+    panel = next(p for p in overview.panels if p.visual == "contributions_timeline")
+    assert panel.choice is not None
+    assert panel.figure is None
+    page = render_html(overview)
+    assert 'class="tl-scroll"' in page
+    assert "Colour by: Modelling tool" in page
+    json.dumps(overview.to_dict())
 
 
 def test_locations_file_is_checked(tmp_path: Path) -> None:
