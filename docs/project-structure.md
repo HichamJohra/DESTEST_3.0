@@ -29,11 +29,22 @@ DESTEST_3.0/
 │       │   ├── components.py   layout blocks, rendering of the dashboard panels
 │       │   ├── pages/          home, overview, detail, comparison, contribute, about
 │       │   └── assets/         style.css
-│       ├── analysis/         KPIs, metrics, visuals, dashboards (shared by all CMEs)
-│       │   ├── kpis.py         KPI functions, e.g. steady_state, integral
-│       │   ├── accuracy_metric.py  accuracy vs the reference, e.g. relative_deviation, nmbe
-│       │   ├── context.py      KPIs of every submission + reference, computed once
-│       │   ├── visuals.py      tables and figures, e.g. kpi_table, profile, carpet
+│       ├── analysis/         comparisons, accuracy grade, visuals, dashboards (all CMEs)
+│       │   ├── general_comparison/         one value per submission
+│       │   │   ├── data_aggregates.py        mean, integral, steady-state value, ...
+│       │   │   └── physics_check.py          heat balance, ΔT, symmetry (with a target)
+│       │   ├── point_by_point_comparison/  series against the reference series
+│       │   │   ├── point_by_point_difference.py  the metrics of Tech. Report 314 (MBE, CVRMSE...)
+│       │   │   ├── time_series.py            time-aware metrics (hourly, 24 h amplitude, DTW...)
+│       │   │   ├── data_profiles.py          profiles, e.g. temperatures along the network
+│       │   │   ├── reference_time_series.py  reference: point-by-point median of all
+│       │   │   ├── reference_data_profiles.py
+│       │   │   ├── time_series_to_reference.py   metrics of each submission vs the reference
+│       │   │   ├── data_profiles_to_reference.py
+│       │   │   └── catalogue.py              docs page of all metrics
+│       │   ├── accuracy_grade/closeness.py the grade 0-100 (closeness to target)
+│       │   ├── context.py      every compared item of every submission, computed once
+│       │   ├── visuals.py      tables and figures, e.g. results_table, profile, carpet
 │       │   ├── maps.py         maps of the contributions (Carto tiles)
 │       │   ├── colors.py       colours by CME (series shades) and by modelling tool
 │       │   ├── timeline.py     submissions per month (home-page timeline)
@@ -74,7 +85,7 @@ DESTEST_3.0/
 
 | You are writing… | Put it in |
 |---|---|
-| A function you will reuse (read a result file, compute a KPI, plot) | a module in a sub-package of `src/destest/`, e.g. `src/destest/kpi/nmbe.py` |
+| A function you will reuse (read a result file, compute a metric, plot) | a module in a sub-package of `src/destest/`, e.g. `src/destest/analysis/general_comparison/physics_check.py` |
 | A new topic with several functions | a new sub-package: a folder in `src/destest/` with an `__init__.py` |
 | Something you run to get a job done | a script in `scripts/` that imports from `destest` |
 | A task others should run from the terminal | a sub-command in `src/destest/cli.py` |
@@ -84,7 +95,6 @@ DESTEST_3.0/
 | A third-party package the code needs | `uv add <package>` (updates `pyproject.toml` and `uv.lock`) |
 
 Possible next sub-packages: `destest.io` (read result and metadata files),
-`destest.kpi` (NMBE and other comparison KPIs), `destest.dashboard` (HTML dashboards),
 `destest.cme` (the exercise graph built from `cme_links.ttl`).
 
 ## Why `src/`?

@@ -146,6 +146,9 @@ td.warn { background: #fff4d6; }
 td.bad { background: #ffd9d6; }
 td.score { font-weight: 600; background: #eef6ee; }
 td.wrap { white-space: normal; text-align: left; min-width: 220px; max-width: 520px; }
+td:first-child, th:first-child { position: sticky; left: 0; z-index: 1;
+  box-shadow: 1px 0 0 #ddd; }
+td:where(:first-child) { background: #fff; }
 .tl-scroll { overflow-x: auto; direction: rtl; }
 .tl { direction: ltr; display: inline-flex; gap: 3px; align-items: flex-end; }
 .tl-col, .tl-stack { display: flex; flex-direction: column; gap: 3px; width: 14px; }

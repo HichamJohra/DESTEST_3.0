@@ -1,4 +1,4 @@
-"""Tests for destest.results and destest.analysis (KPIs, metrics, visuals, dashboards)."""
+"""Tests for destest.results and destest.analysis (comparisons, grade, visuals, dashboards)."""
 
 import json
 from datetime import date
@@ -9,22 +9,19 @@ import pytest
 import yaml
 
 from destest.analysis import (
-    KPI_FUNCTIONS,
+    GENERAL_FUNCTIONS,
     VISUALS,
     Table,
     build_context,
     build_dashboard,
     render_html,
 )
-from destest.analysis.accuracy_metric import (
-    SERIES_METRICS,
-    VALUE_METRICS,
-    closeness_grade,
-    closeness_scores,
-    reference_series,
-)
+from destest.analysis.accuracy_grade import closeness_grade, closeness_scores
 from destest.analysis.colors import cme_colors, tool_colors
+from destest.analysis.general_comparison import VALUE_DIFFERENCES
 from destest.analysis.maps import contributions_pie, exercises_map
+from destest.analysis.point_by_point_comparison import POINT_METRICS, reference_time_series
+from destest.analysis.point_by_point_comparison.catalogue import metrics_catalogue_markdown
 from destest.analysis.timeline import Timeline, submission_timeline
 from destest.analysis.visuals import Choice, rank_color
 from destest.cli import main
@@ -49,7 +46,7 @@ def subs() -> list[Submission]:
     return load_cme_submissions(CME_FOLDER)
 
 
-# ---- KPI functions and metrics ---------------------------------------------------------
+# ---- general comparison and metrics -----------------------------------------------------------
 @pytest.mark.parametrize(
     ("name", "values", "params", "expected"),
     [
@@ -64,30 +61,89 @@ def subs() -> list[Submission]:
         ("mean", [None, None], {}, None),
     ],
 )
-def test_kpi_functions(
+def test_data_aggregates(
     name: str, values: list[float | None], params: dict[str, Any], expected: float | None
 ) -> None:
     time = [float(i) for i in range(len(values))]
-    assert KPI_FUNCTIONS[name](values, time, **params) == expected
+    assert GENERAL_FUNCTIONS[name].evaluate({"values": values}, time, params) == expected
 
 
-def test_value_metrics() -> None:
-    assert VALUE_METRICS["relative_deviation"](110.0, 100.0) == pytest.approx(10.0)
-    assert VALUE_METRICS["relative_deviation"](1.0, 0.0) is None
-    assert VALUE_METRICS["absolute_deviation"](110.0, 100.0) == 10.0
+def test_integral_in_kwh() -> None:
+    f = GENERAL_FUNCTIONS["integral"]
+    assert f.evaluate({"values": [1000.0, 1000.0]}, [0.0, 3600.0], {"to_unit": "kWh"}) == 1.0
+    with pytest.raises(ValueError, match="to_unit"):
+        f.evaluate({"values": [1.0, 1.0]}, [0.0, 1.0], {"to_unit": "kcal"})
 
 
-def test_series_metrics() -> None:
+def test_physics_checks() -> None:
+    hb = GENERAL_FUNCTIONS["heat_balance_error"]
+    assert hb.inputs == ["power", "m_flow", "T_hot", "T_cold"]
+    data = {"power": [43890.0], "m_flow": [3600.0], "T_hot": [70.0], "T_cold": [60.0]}
+    assert hb.evaluate(data, [0.0], {}) == pytest.approx(5.0)  # 41.8 kW ideal, 43.89 reported
+    dt = GENERAL_FUNCTIONS["temperature_difference"]
+    assert dt.optional_inputs == ["m_flow"]
+    data = {"T_hot": [70.0, 40.0], "T_cold": [40.0, 38.0], "m_flow": [100.0, 0.0]}
+    assert dt.evaluate(data, [0.0, 1.0], {"min_flow": 5.6}) == 30.0  # no-flow row left out
+    sym = GENERAL_FUNCTIONS["relative_difference"]
+    assert sym.evaluate({"a": [110.0], "b": [90.0]}, [0.0], {}) == pytest.approx(20.0)
+    below = GENERAL_FUNCTIONS["time_steps_below"]
+    assert below.required_parameters == {"threshold"}
+    data = {"values": [27.0, 27.95, 30.0, 15.0], "m_flow": [10.0, 10.0, 10.0, 0.0]}
+    assert below.evaluate(data, [0.0, 1.0, 2.0, 3.0], {"threshold": 28, "min_flow": 5.6}) == 1
+
+
+def test_value_differences() -> None:
+    assert VALUE_DIFFERENCES["relative_deviation"](110.0, 100.0) == pytest.approx(10.0)
+    assert VALUE_DIFFERENCES["relative_deviation"](1.0, 0.0) is None
+    assert VALUE_DIFFERENCES["absolute_deviation"](110.0, 100.0) == 10.0
+
+
+def test_point_by_point_metrics() -> None:
     y, ref = [1.0, 3.0, None], [2.0, 2.0, 2.0]
-    assert SERIES_METRICS["nmbe"](y, ref) == pytest.approx(0.0)
-    assert SERIES_METRICS["cvrmse"](y, ref) == pytest.approx(50.0)
-    assert SERIES_METRICS["rmse"](y, ref) == pytest.approx(1.0)
-    assert SERIES_METRICS["mae"](y, ref) == pytest.approx(1.0)
-    assert SERIES_METRICS["max_abs_error"](y, ref) == pytest.approx(1.0)
+    assert POINT_METRICS["MBE"](y, ref) == pytest.approx(0.0)
+    assert POINT_METRICS["NMBE"](y, ref) == pytest.approx(0.0)
+    assert POINT_METRICS["CVRMSE"](y, ref) == pytest.approx(50.0)
+    assert POINT_METRICS["RMSE"](y, ref) == pytest.approx(1.0)
+    assert POINT_METRICS["MAE"](y, ref) == pytest.approx(1.0)
+    assert POINT_METRICS["MaxAE"](y, ref) == pytest.approx(1.0)
 
 
-def test_reference_series_uses_the_most_common_length() -> None:
-    ref = reference_series([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [9.0]], "median")
+@pytest.mark.parametrize("name", sorted(POINT_METRICS))
+def test_every_metric_is_ideal_for_a_perfect_fit(name: str) -> None:
+    x = [10.0, 12.0, 15.0, 11.0, 13.0, 14.0]
+    metric = POINT_METRICS[name]
+    value = metric(x, x)
+    if name in {"TheilUm", "TheilUv", "TheilUc", "ACF", "rMAE", "sd_error"}:
+        assert value is None  # undefined for a perfect fit, no baseline, or a single period
+    else:
+        assert value == pytest.approx(metric.ideal(x))
+    assert metric.full_name
+    assert metric.unit in {"X", "X^2", "%", "-"}
+
+
+def test_tr314_corrections() -> None:
+    y, x = [1.0, 2.0, 4.0], [1.0, 2.0, 3.0]
+    assert POINT_METRICS["MedianAPE"](y, x) == pytest.approx(0.0)
+    assert POINT_METRICS["MaxAPE"](y, x) == pytest.approx(100 / 3)
+    assert POINT_METRICS["IA"](x, x) == 100.0  # Willmott: 1 - ..., optimum 100 %
+    assert POINT_METRICS["R2"](y, x) == pytest.approx(1 - 1 / 2)  # 1 - RSS / TSS
+    theil = [POINT_METRICS[k](y, x) for k in ("TheilUm", "TheilUv", "TheilUc")]
+    assert sum(t or 0.0 for t in theil) == pytest.approx(1.0)
+    assert POINT_METRICS["Cov"].ideal(x) == pytest.approx(1.0)  # Var(x)
+
+
+def test_metrics_catalogue_page_is_current() -> None:
+    # docs/comparison-metrics.md is written by scripts/make_metrics_doc.py from the code
+    doc = Path(__file__).resolve().parents[1] / "docs" / "comparison-metrics.md"
+    assert doc.read_text(encoding="utf-8") == metrics_catalogue_markdown(), (
+        "run: uv run python scripts/make_metrics_doc.py"
+    )
+    for name in POINT_METRICS:
+        assert f"`{name}`" in doc.read_text(encoding="utf-8")
+
+
+def test_reference_time_series_uses_the_most_common_length() -> None:
+    ref = reference_time_series([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [9.0]], "median")
     assert ref == [3.0, 4.0]
 
 
@@ -115,20 +171,26 @@ def test_load_submission_refuses_invalid_files(tmp_path: Path) -> None:
 
 # ---- context: the numbers behind every dashboard ---------------------------------------------
 @needs_results
-def test_context_kpis_and_reference(subs: list[Submission]) -> None:
+def test_context_items_and_reference(subs: list[Submission]) -> None:
     ctx = build_context(SPEC, subs)
-    assert len(ctx.reference) == 18
+    # 18 steady-state values + 3 physics checks + 2 profiles x 2 metrics
+    assert len(ctx.items) == 25
     assert ctx.reference["T_supply_i"] == pytest.approx(70.0, abs=0.01)
+    assert ctx.reference["heat_balance_source"] == 0  # target, not the median
+    assert ctx.reference["supply_temperature_profile:MBE"] == 0  # ideal value of MBE
     laluce = next(s for s in subs if "Laluce" in s.label)
-    assert ctx.kpi_values[laluce.id]["Q_supplied"] == pytest.approx(308203)
+    assert ctx.values[laluce.id]["Q_supplied"] == pytest.approx(308203)
+    assert ctx.values[laluce.id]["heat_balance_source"] == pytest.approx(-1.74, abs=0.01)
     vicus = next(s for s in subs if s.label.startswith("SIM VICUS"))
     assert ctx.metric("relative_deviation", vicus, "Q_loss_supply_i_h") == pytest.approx(
         31.6, abs=0.1
     )
-    # steady state: deviation of the KPI value equals the NMBE of the time series
-    assert ctx.metric("nmbe", vicus, "Q_loss_supply_i_h") == pytest.approx(
+    # steady state: deviation of the value equals the NMBE of the time series
+    assert ctx.metric("NMBE", vicus, "Q_loss_supply_i_h") == pytest.approx(
         ctx.metric("relative_deviation", vicus, "Q_loss_supply_i_h"), abs=0.01
     )
+    trnsys = next(s for s in subs if s.label.startswith("TRNSYS 2022"))
+    assert ctx.values[trnsys.id]["pressure_drop_symmetry"] == pytest.approx(-7.89, abs=0.01)
     assert len({ctx.colors[s.id] for s in subs}) == 7
 
 
@@ -138,10 +200,10 @@ def test_context_kpis_and_reference(subs: list[Submission]) -> None:
 def test_every_visual_builds_and_is_json(subs: list[Submission], name: str) -> None:
     ctx = build_context(SPEC, subs)
     per_visual: dict[str, dict[str, Any]] = {
-        "profile": {"kpis": ["T_supply_i", "T_supply_h"], "x_labels": ["i", "h"]},
+        "profile": {"items": ["T_supply_i", "T_supply_h"], "x_labels": ["i", "h"]},
         "time_series": {"columns": ["T_supply_i"], "show_reference": True},
         "carpet": {"column": "Q_supplied", "period": 5},
-        "kpi_bar": {"kpis": ["Q_supplied"]},
+        "value_bar": {"items": ["Q_supplied"]},
     }
     options = per_visual.get(name, {})
     result = VISUALS[name].builder(ctx, **options)
@@ -162,21 +224,86 @@ def test_every_visual_builds_and_is_json(subs: list[Submission], name: str) -> N
 
 
 @needs_results
-def test_kpi_table_marks_large_deviations(subs: list[Submission]) -> None:
-    table = VISUALS["kpi_table"].builder(build_context(SPEC, subs), kpis=["Q_loss_supply_i_h"])
+def test_results_table_marks_large_deviations(subs: list[Submission]) -> None:
+    ctx = build_context(SPEC, subs)
+    table = VISUALS["results_table"].builder(ctx, items=["Q_loss_supply_i_h"])
     assert isinstance(table, Table)
-    assert table.headers[1] == "Weight"
-    assert table.headers[2] == "Reference (median of 7)"
-    assert table.rows[0][0] == "Closeness to the reference [0-100]"
-    assert table.rows[0][1] == "18 (sum)"  # weights of all KPIs, also those not shown
-    assert table.rows[1][1] == "1"
-    assert "bad" in table.classes[1]  # SIM VICUS and TRNSYS 2021 are > 20 % off
-    no_weights = VISUALS["kpi_table"].builder(build_context(SPEC, subs), weights=False)
+    assert table.headers[:5] == [
+        "Compared item",
+        "Weight",
+        "Target",
+        "Acceptable deviation",
+        "Critical deviation",
+    ]
+    assert table.rows[0][0] == "Closeness to target [0-100]"
+    # weights of all items, also those not shown: 6 values + 3 checks + 4 profile metrics
+    assert table.rows[0][1] == "13 (sum)"
+    row = table.rows[1]
+    assert row[1] == "1"
+    assert row[2].endswith("(reference: median of 7)")
+    assert row[3:5] == ["±5 %", "±20 %"]  # default_limits of CME_DHN_1
+    assert table.classes[1][3:5] == ["warn", "bad"]  # limit cells in the highlight colours
+    assert "bad" in table.classes[1][5:]  # SIM VICUS and TRNSYS 2021 are > 20 % off
+    assert table.classes[0][2] == "ref score"  # closeness row: shaded under "Target"
+    checks = VISUALS["results_table"].builder(ctx, items=["substation_temperature_difference"])
+    assert isinstance(checks, Table)
+    assert checks.rows[1][2:5] == ["30 (target)", "±0.1 K", "±0.5 K"]
+    assert "%" not in checks.rows[1][5]  # no deviation in % for a target
+    vicus = next(i for i, h in enumerate(checks.headers) if h.startswith("SIM VICUS"))
+    old = next(i for i, h in enumerate(checks.headers) if h.startswith("TRNSYS 2021"))
+    assert checks.classes[1][vicus] == "warn"  # 29.59 K: 0.41 K from 30 (0.1 < 0.41 < 0.5)
+    assert checks.classes[1][old] == "bad"  # 29.48 K: 0.52 K from 30
+    metric = VISUALS["results_table"].builder(ctx, items=["supply_temperature_profile:MBE"])
+    assert isinstance(metric, Table)
+    assert metric.rows[1][2:5] == ["0 (ideal)", "±0.1 degC", "±0.3 degC"]
+    no_weights = VISUALS["results_table"].builder(ctx, weights=False, limits=False)
     assert isinstance(no_weights, Table)
-    assert no_weights.headers[1] == "Reference (median of 7)"
+    assert no_weights.headers[1] == "Target"
 
 
-# ---- closeness to the reference ---------------------------------------------------------------
+@needs_results
+def test_item_selections(subs: list[Submission]) -> None:
+    ctx = build_context(SPEC, subs)
+    assert len(ctx.item_keys("all")) == 25
+    assert len(ctx.item_keys("general")) == 21  # 18 values + 3 physics checks
+    aggregates = ctx.item_keys("aggregates")
+    assert len(aggregates) == 18
+    assert "heat_balance_source" not in aggregates
+
+
+@needs_results
+def test_tables_are_ordered_by_grade(subs: list[Submission]) -> None:
+    ctx = build_context(SPEC, subs)
+    by_grade = sorted(subs, key=lambda s: -(ctx.closeness[s.id] or 0.0))
+    table = VISUALS["results_table"].builder(ctx)
+    assert isinstance(table, Table)
+    assert table.headers[5:] == [s.label for s in by_grade]  # best on the left
+    assert table.headers[5].startswith("Modelica Buildings - M. Frandsen")
+    contributions = VISUALS["data_check_table"].builder(ctx)
+    assert isinstance(contributions, Table)
+    assert [r[0] for r in contributions.rows] == [s.label for s in by_grade]  # best on top
+    plain = VISUALS["data_check_table"].builder(ctx, ranked=False)
+    assert isinstance(plain, Table)
+    assert [r[0] for r in plain.rows] == [s.label for s in ctx.focus]
+
+
+@needs_results
+def test_results_table_puts_zero_weight_items_last(subs: list[Submission]) -> None:
+    ctx = build_context(SPEC, subs)
+    table = VISUALS["results_table"].builder(ctx)
+    assert isinstance(table, Table)
+    labels = [r[0] for r in table.rows]
+    sep = next(i for i, x in enumerate(labels) if x.startswith("Not counted in the grade"))
+    assert sep == 1 + 13  # closeness row + the 13 counted items
+    assert all(r[1] == "0" for r in table.rows[sep + 1 :])  # then the 12 temperatures
+    assert len(table.rows) == sep + 1 + 12
+    assert all(len(r) == len(table.headers) for r in table.rows)
+    plain = VISUALS["results_table"].builder(ctx, zero_weight_last=False)
+    assert isinstance(plain, Table)
+    assert len(plain.rows) == 1 + 25  # spec order, no separator
+
+
+# ---- closeness to target ---------------------------------------------------------------
 def test_closeness_scores_and_grade() -> None:
     scores = closeness_scores({"a": 1.0, "b": 3.0, "c": 2.0, "d": None}, 1.0)
     assert scores == {"a": 100.0, "b": 0.0, "c": 50.0, "d": None}
@@ -196,27 +323,36 @@ def test_closeness_of_cme_dhn_1(subs: list[Submission]) -> None:
     grades = {s.label: ctx.closeness[s.id] for s in subs}
     assert all(g is not None and 0 <= g <= 100 for g in grades.values())
     worst = min(subs, key=lambda s: ctx.closeness[s.id] or 0.0)
-    assert worst.label.startswith("SIM VICUS")
+    # TRNSYS 2021 (heat loss +37 %, dp asymmetry) and SIM VICUS (heat loss +32 %) are last
+    assert worst.label.startswith(("TRNSYS 2021", "SIM VICUS"))
     assert ctx.closeness_rank(worst) == (7, 7)
-    # the grade is the mean of the 18 KPI scores (all weights 1)
-    assert SPEC.analysis is not None
-    assert {k.weight for k in SPEC.analysis.kpis} == {1.0}
-    scores = list(ctx.kpi_scores[worst.id].values())
-    assert len(scores) == 18
-    assert ctx.closeness[worst.id] == pytest.approx(sum(s or 0 for s in scores) / 18)
+    # the grade is the weighted mean of the item scores (12 temperatures weight 0)
+    weights = {i.key: i.weight for i in ctx.items}
+    assert weights["T_supply_h"] == 0
+    assert weights["T_return_district"] == 0
+    assert weights["m_flow_supply_i"] == 1
+    assert weights["dp_return_i_h"] == 1
+    assert weights["supply_temperature_profile:CVRMSE"] == 1
+    counted = [k for k, w in weights.items() if w > 0]
+    assert len(counted) == 13
+    expected = sum(ctx.scores[worst.id][k] or 0 for k in counted) / len(counted)
+    assert ctx.closeness[worst.id] == pytest.approx(expected)
 
 
 @needs_results
-def test_kpi_weights_change_the_grade(subs: list[Submission]) -> None:
+def test_weights_change_the_grade(subs: list[Submission]) -> None:
     assert SPEC.analysis is not None
-    first = SPEC.analysis.kpis[0].key
-    kpis = [
-        k.model_copy(update={"weight": 1.0 if k.key == first else 0.0}) for k in SPEC.analysis.kpis
+    first = SPEC.analysis.general_comparison[0].key
+    general = [
+        g.model_copy(update={"weight": 1.0 if g.key == first else 0.0})
+        for g in SPEC.analysis.general_comparison
     ]
-    analysis = SPEC.analysis.model_copy(update={"kpis": kpis})
+    analysis = SPEC.analysis.model_copy(
+        update={"general_comparison": general, "point_by_point_comparison": None}
+    )
     ctx = build_context(SPEC.model_copy(update={"analysis": analysis}), subs)
-    for s in subs:  # only the first KPI counts
-        assert ctx.closeness[s.id] == ctx.kpi_scores[s.id][first]
+    for s in subs:  # only the first item counts
+        assert ctx.closeness[s.id] == ctx.scores[s.id][first]
 
 
 @needs_results
@@ -231,7 +367,7 @@ def test_submission_table_has_dates_issues_and_closeness(subs: list[Submission])
         "Created",
         "Data file",
         "Metadata file",
-        "Closeness to the reference [0-100]",
+        "Closeness to target [0-100]",
         "Errors",
         "Warnings",
     ]
@@ -259,7 +395,7 @@ def test_closeness_bar_ranks_best_first(subs: list[Submission]) -> None:
     assert bar["y"] == sorted(bar["y"], reverse=True)
     assert bar["marker"]["color"][0] == rank_color(1, 7)
     assert bar["marker"]["color"][-1] == rank_color(7, 7)
-    assert bar["x"][0].startswith("Modelica Buildings<br>M. Frandsen")
+    assert bar["x"][0].startswith("Modelica Buildings<br>M. Frandsen")  # grade 94.2
 
 
 @needs_results
@@ -287,7 +423,7 @@ def test_rank_colors_go_from_green_to_pale_red() -> None:
 
 @needs_results
 def test_bars_have_readable_labels_and_a_reference_legend(subs: list[Submission]) -> None:
-    fig = VISUALS["kpi_bar"].builder(build_context(SPEC, subs), kpis=["Q_supplied"])
+    fig = VISUALS["value_bar"].builder(build_context(SPEC, subs), items=["Q_supplied"])
     assert isinstance(fig, dict)
     bars = [t for t in fig["data"] if t["type"] == "bar"]
     assert bars[0]["x"][0].count("<br>") == 2  # tool + version / modeller / institution
@@ -504,15 +640,39 @@ def panel(analysis: dict[str, Any], dashboard: str, visual: str) -> dict[str, An
     return next(p for p in analysis["dashboards"][dashboard] if p["visual"] == visual)
 
 
+def general(analysis: dict[str, Any], key: str) -> dict[str, Any]:
+    """The general-comparison entry with this key."""
+    return next(g for g in analysis["general_comparison"] if g["key"] == key)
+
+
 @pytest.mark.parametrize(
     ("change", "expected"),
     [
-        (lambda a: a["kpis"][0].update(function="median"), "unknown 'median'"),
-        (lambda a: a["kpis"][0].update(params={"last": 2}), "has no parameter last"),
-        (lambda a: a["kpis"][0].update(column="T_x"), "'T_x' is not a column"),
-        (lambda a: a["kpis"].append(dict(a["kpis"][0])), "key used more than once"),
-        (lambda a: a["kpis"][0].update(weight=-1), "greater than or equal to 0"),
-        (lambda a: [k.update(weight=0) for k in a["kpis"]], "weight above 0"),
+        (lambda a: a["general_comparison"][0].update(function="median"), "unknown 'median'"),
+        (lambda a: a["general_comparison"][0].update(params={"last": 2}), "has no parameter last"),
+        (lambda a: a["general_comparison"][0].update(column="T_x"), "'T_x' is not a column"),
+        (
+            lambda a: a["general_comparison"].append(dict(a["general_comparison"][0])),
+            "key used more than once",
+        ),
+        (lambda a: a["general_comparison"][0].update(weight=-1), "greater than or equal to 0"),
+        (lambda a: general(a, "heat_balance_source")["inputs"].pop("power"), "needs the input"),
+        (
+            lambda a: general(a, "heat_balance_source")["inputs"].update(x="T_supply_i"),
+            "no input x",
+        ),
+        (lambda a: a["general_comparison"][0].update(inputs={"a": "T_supply_i"}), "either"),
+        (lambda a: a["point_by_point_comparison"]["metrics"].append("XYZ"), "unknown metric"),
+        (
+            lambda a: a["point_by_point_comparison"]["metrics"].append("HourlyCVRMSE"),
+            "unknown metric",  # time-series metric, but CME_DHN_1 compares profiles only
+        ),
+        (
+            lambda a: a["point_by_point_comparison"]["data_profiles"][0]["points"].__setitem__(
+                0, "T_x"
+            ),
+            "'T_x' is not a column",
+        ),
         (
             lambda a: panel(a, "overview", "contributions_map").update(visual="pie"),
             "unknown 'pie'",
@@ -522,8 +682,8 @@ def panel(analysis: dict[str, Any], dashboard: str, visual: str) -> dict[str, An
             "has no option colour",
         ),
         (
-            lambda a: panel(a, "overview", "deviation_heatmap")["options"].update(kpis=["Q_los"]),
-            "not a KPI key: Q_los",
+            lambda a: panel(a, "overview", "deviation_heatmap")["options"].update(items=["Q_los"]),
+            "not a compared item key: Q_los",
         ),
         (
             lambda a: panel(a, "detail", "time_series")["options"].update(columns=["T_x"]),
@@ -545,7 +705,7 @@ DHN_2 = RESULT_DATA / "CME_DHN_2"
 
 
 @pytest.mark.skipif(not DHN_2.is_dir(), reason="no CME_DHN_2 results")
-def test_cme_dhn_2_kpis_and_dashboards() -> None:
+def test_cme_dhn_2_comparison_and_dashboards() -> None:
     spec = load_cme_spec("DHN", 2)
     assert spec.analysis is not None
     subs = load_cme_submissions(DHN_2)
@@ -553,10 +713,15 @@ def test_cme_dhn_2_kpis_and_dashboards() -> None:
     sub = subs[0]
     assert len(sub.series["T_supply_district"]) == 673
     ctx = build_context(spec, subs)
-    kpis = ctx.kpi_values[sub.id]
-    assert kpis["E_delivered_district"] == pytest.approx(866.0, abs=0.5)  # kWh in the week
-    assert kpis["E_loss_total"] == pytest.approx(739.5, abs=0.5)
-    assert kpis["m_flow_return_district"] == pytest.approx(148.4, abs=0.5)  # kg/h
+    v = ctx.values[sub.id]
+    assert v["E_delivered_district"] == pytest.approx(866.0, abs=0.5)  # kWh in the week
+    assert v["E_loss_total"] == pytest.approx(739.5, abs=0.5)
+    assert v["m_flow_return_district"] == pytest.approx(148.4, abs=0.5)  # kg/h
+    assert v["outlet_below_28C"] == 10  # the 28 C limit is not applied (see the metadata)
+    assert v["substation_temperature_difference"] == pytest.approx(29.2, abs=0.05)
+    # 9 columns x MBE, CVRMSE against the reference time series (itself: perfect fit)
+    assert v["T_supply_district:MBE"] == 0.0
+    assert v["dp_substation_district:CVRMSE"] is None  # all zero: mean of reference = 0
     assert ctx.closeness[sub.id] == 100.0  # alone: it is the reference
     for kind, focus in (("overview", None), ("detail", subs), ("comparison", subs)):
         board = build_dashboard(spec, subs, kind, focus)

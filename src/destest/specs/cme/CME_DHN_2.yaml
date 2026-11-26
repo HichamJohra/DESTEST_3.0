@@ -238,25 +238,42 @@ result_metadata:
       description: Initial temperatures and pressures, warm-up period before t = 0
 
 # =============================================================================
-# Analysis: KPIs and dashboards
+# Analysis: what is compared, and the dashboards
 # =============================================================================
-# Building blocks (shared by all CMEs, see the docs page "Dashboards"):
-#   function  a KPI function from destest/analysis/kpis.py, e.g. steady_state, mean,
-#             integral; `params` passes its keyword parameters; `weight` is the KPI's
-#             share in the closeness grade (default 1, 0 = shown but not counted)
-#   visual    a table or figure from destest/analysis/visuals.py, e.g. kpi_table,
-#             deviation_heatmap, kpi_bar, profile, time_series, carpet,
+# Building blocks (shared by all CMEs, see the docs pages "Dashboards" and "Comparison
+# metrics"):
+#   general_comparison        one value per submission (destest/analysis/general_comparison):
+#     function   a data aggregate (steady_state, mean, integral, ...) or a physics check
+#                (heat_balance_error, temperature_difference, relative_difference,
+#                time_steps_below)
+#     column     its one input series, or `inputs` (input name -> column) for several
+#     params     its keyword parameters; `target`: known ideal value (physics checks),
+#                otherwise the value is compared with the median of all submissions
+#     weight     share in the accuracy grade (default 1, 0 = shown but not counted)
+#   point_by_point_comparison series against the reference series, point by point
+#     metrics    comparison metrics of Technical Report 314 (MBE, CVRMSE, ...), each with
+#                an optional weight; `time_series`: columns compared as time series;
+#                `data_profiles`: columns read as one profile (e.g. along the network)
+#   visual    a table or figure from destest/analysis/visuals.py, e.g. results_table,
+#             deviation_heatmap, value_bar, profile, time_series, carpet,
 #             metadata_table, data_check_table, closeness_bar, contributions_map,
 #             contributions_timeline, contributions_pie;
 #             `options` are its keyword options
-# Checked on load: unknown functions, visuals, options or keys are errors.
+# Checked on load: unknown functions, metrics, visuals, options or keys are errors.
 analysis:
 
   reference: median            # reference = median of all submissions, point by point
   reference_note: >-
     There is no measured or analytical truth for this exercise. The reference is the median
-    of all valid submissions, value by value for the KPIs and time step by time step for the
+    of all valid submissions, value by value for the compared values and time step by time step for the
     time series, so that a single outlying result does not shift it.
+
+  # Highlight limits (TO BE AGREED): values beyond `acceptable` are yellow, beyond `critical`
+  # red. `default_limits` apply to the values compared with the median (deviation in % of
+  # the median); targets and metrics have their own (difference in their unit).
+  default_limits:
+    acceptable: 5
+    critical: 20
 
   # Comments and observations on the results, one bullet each (last card of the overview).
   comments_and_observations:
@@ -265,9 +282,9 @@ analysis:
     - Observation 1
     - Observation 2
 
-  # One KPI per time series: weekly mean, or weekly energy in kWh (integral of the power).
-  # Time-series comparison metrics (NMBE, CVRMSE, ...) will be added later. TO BE AGREED.
-  kpis:                        # weight: share in the closeness grade (0 = not counted)
+  # One value per time series: weekly mean, or weekly energy in kWh (integral of the
+  # power), compared with the median of all submissions; then the physics checks.
+  general_comparison:          # weight: share in the accuracy grade (0 = not counted)
     - key: T_supply_district
       label: Mean supply temperature SimpleDistrict_1
       column: T_supply_district
@@ -301,7 +318,7 @@ analysis:
       column: Q_delivered_district
       function: integral
       params:
-        factor: 2.7777777777777776e-07   # J -> kWh
+        to_unit: kWh                     # integral of W over s (J), in kWh
       unit: kWh
       weight: 1
 
@@ -310,7 +327,7 @@ analysis:
       column: Q_loss_supply_i_h
       function: integral
       params:
-        factor: 2.7777777777777776e-07   # J -> kWh
+        to_unit: kWh                     # integral of W over s (J), in kWh
       unit: kWh
       weight: 1
 
@@ -319,7 +336,7 @@ analysis:
       column: Q_loss_total
       function: integral
       params:
-        factor: 2.7777777777777776e-07   # J -> kWh
+        to_unit: kWh                     # integral of W over s (J), in kWh
       unit: kWh
       weight: 1
 
@@ -337,13 +354,79 @@ analysis:
       unit: Pa
       weight: 1
 
+    # Physics checks: compared with a known target, not with the median of all.
+    # "With flow": above 1 % of the nominal substation flow (555.4 kg/h), i.e. 5.6 kg/h.
+    - key: substation_temperature_difference
+      label: Temperature difference over substation SimpleDistrict_1 (with flow)
+      function: temperature_difference
+      inputs:
+        T_hot: T_supply_district
+        T_cold: T_return_district
+        m_flow: m_flow_return_district
+      params:
+        min_flow: 5.6
+      unit: K
+      target: 30
+      weight: 1
+      limits:                  # difference from 30 K, in K
+        acceptable: 0.5
+        critical: 2
+
+    - key: heat_balance_district
+      label: Heat balance at SimpleDistrict_1 (Q vs m cp dT, with flow)
+      function: heat_balance_error
+      inputs:
+        power: Q_delivered_district
+        m_flow: m_flow_return_district
+        T_hot: T_supply_district
+        T_cold: T_return_district
+      params:
+        cp: 4180
+        m_flow_unit: kg/h
+        min_flow: 5.6
+      unit: "%"
+      target: 0
+      weight: 1
+      limits:                  # difference from 0 %, in %-points
+        acceptable: 0.5
+        critical: 2
+
+    - key: outlet_below_28C
+      label: Time steps with the substation outlet below 28 C (with flow)
+      function: time_steps_below
+      inputs:
+        values: T_return_district
+        m_flow: m_flow_return_district
+      params:
+        threshold: 28
+        tolerance: 0.1
+        min_flow: 5.6
+      unit: time steps
+      target: 0
+      weight: 1
+      limits:                  # number of 15-min time steps
+        acceptable: 0
+        critical: 4
+
+  # Series compared point by point with the reference time series (median of all
+  # submissions, time step by time step).
+  point_by_point_comparison:
+    metrics:                   # Technical Report 314 names; weight 1 each by default
+      - MBE                    # no limits: its unit differs per column
+      - name: CVRMSE
+        limits:                # in %; indicative, cf. ASHRAE Guideline 14 (30 % hourly)
+          acceptable: 15
+          critical: 30
+    time_series:
+      columns: all             # every column but the time column
+
   dashboards:
 
     # All submissions of the CME
     overview:
       - visual: closeness_bar
-        title: Ranking by closeness to the reference
-        description: Grade 0-100 over all KPIs, best first (see the KPI table for the details).
+        title: Ranking by closeness to target
+        description: Grade 0-100 over all compared items, best first (see the results summary for the details).
         options:
           colors: rank
 
@@ -375,25 +458,33 @@ analysis:
             - institution
             - country
 
-      - visual: kpi_table
-        title: Key performance indicators
-        description: Weekly means and energies; deviation from the reference in brackets.
+      - visual: results_table
+        title: Results summary
         options:
-          kpis: all
+          items: all
           deviation: true
 
       - visual: deviation_heatmap
-        title: Deviation of the KPIs from the reference [%]
+        title: Deviation from the median [%]
         options:
-          kpis: all
+          items: aggregates       # data aggregates only (not the physics checks)
           metric: relative_deviation
 
       - visual: deviation_heatmap
         title: CVRMSE of the time series against the reference [%]
         description: Coefficient of variation of the RMSE, time step by time step, per variable.
         options:
-          kpis: all
-          metric: cvrmse
+          items:                   # one per column (the weekly values of the 9 series)
+            - T_supply_district
+            - T_return_district
+            - T_return_i
+            - m_flow_return_district
+            - E_delivered_district
+            - E_loss_supply_i_h
+            - E_loss_total
+            - dp_substation_district
+            - dp_return_i_h
+          metric: CVRMSE
 
       - visual: time_series
         title: Temperatures
@@ -428,10 +519,10 @@ analysis:
             - dp_return_i_h
           show_reference: true
 
-      - visual: kpi_bar
+      - visual: value_bar
         title: Weekly energies
         options:
-          kpis:
+          items:
             - E_delivered_district
             - E_loss_supply_i_h
             - E_loss_total
@@ -439,20 +530,20 @@ analysis:
     # One submission against the reference
     detail:
       - visual: closeness_bar
-        title: Ranking by closeness to the reference
-        description: Grade 0-100 over all KPIs; colour and rank among all submissions of the CME.
+        title: Ranking by closeness to target
+        description: Grade 0-100 over all compared items; colour and rank among all submissions of the CME.
         options:
           colors: rank
           submissions: selected
 
       - visual: data_check_table
         title: Submission
-        description: Creation date, result of `destest check` and closeness to the reference.
+        description: Creation date, result of `destest check` and closeness to target.
 
-      - visual: kpi_table
-        title: Key performance indicators
+      - visual: results_table
+        title: Results summary
         options:
-          kpis: all
+          items: all
           deviation: true
 
       - visual: time_series
@@ -487,27 +578,36 @@ analysis:
     # A selection of submissions against the reference
     comparison:
       - visual: closeness_bar
-        title: Ranking by closeness to the reference
-        description: Grade 0-100 over all KPIs, best first; colour and rank among all submissions.
+        title: Ranking by closeness to target
+        description: Grade 0-100 over all compared items, best first; colour and rank among all submissions.
         options:
           colors: rank
           submissions: selected
 
       - visual: data_check_table
         title: Submissions
-        description: Creation date, result of `destest check` and closeness to the reference.
+        description: Creation date, result of `destest check` and closeness to target.
 
-      - visual: kpi_table
-        title: Key performance indicators
+      - visual: results_table
+        title: Results summary
         options:
-          kpis: all
+          items: all
           deviation: true
 
       - visual: deviation_heatmap
         title: CVRMSE of the time series against the reference [%]
         options:
-          kpis: all
-          metric: cvrmse
+          items:                   # one per column (the weekly values of the 9 series)
+            - T_supply_district
+            - T_return_district
+            - T_return_i
+            - m_flow_return_district
+            - E_delivered_district
+            - E_loss_supply_i_h
+            - E_loss_total
+            - dp_substation_district
+            - dp_return_i_h
+          metric: CVRMSE
 
       - visual: time_series
         title: Temperatures

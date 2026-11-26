@@ -158,21 +158,51 @@ def _check_analysis(spec: CmeSpec) -> list[str]:
     """Names in the `analysis` section that the analysis code does not know."""
     if spec.analysis is None:
         return []
-    from ..analysis.kpis import KPI_FUNCTIONS, parameters  # here: avoids an import cycle
+    # imported here: avoids an import cycle (the analysis code imports the specs)
+    from ..analysis.context import item_keys
+    from ..analysis.general_comparison import GENERAL_FUNCTIONS
+    from ..analysis.point_by_point_comparison import POINT_METRICS, all_time_series_metrics
     from ..analysis.visuals import VISUALS
 
     problems: list[str] = []
-    kpi_keys = {k.key for k in spec.analysis.kpis}
-    columns = {c.key for c in spec.result_data.columns}
-    for k in spec.analysis.kpis:
-        where = f"analysis.kpis.{k.key}"
-        if k.function not in KPI_FUNCTIONS:
-            known = ", ".join(sorted(KPI_FUNCTIONS))
-            problems.append(f"{where}.function: unknown '{k.function}' (known: {known})")
+    for g in spec.analysis.general_comparison:
+        where = f"analysis.general_comparison.{g.key}"
+        f = GENERAL_FUNCTIONS.get(g.function)
+        if f is None:
+            known = ", ".join(sorted(GENERAL_FUNCTIONS))
+            problems.append(f"{where}.function: unknown '{g.function}' (known: {known})")
             continue
-        extra = sorted(set(k.params) - parameters(k.function))
+        given = set(g.columns_by_input)
+        missing = sorted(set(f.inputs) - given)
+        extra = sorted(given - set(f.inputs) - set(f.optional_inputs))
+        if missing:
+            problems.append(f"{where}: '{g.function}' needs the input(s) {', '.join(missing)}")
         if extra:
-            problems.append(f"{where}.params: '{k.function}' has no parameter {', '.join(extra)}")
+            problems.append(f"{where}: '{g.function}' has no input {', '.join(extra)}")
+        extra = sorted(set(g.params) - f.parameters)
+        if extra:
+            problems.append(f"{where}.params: '{g.function}' has no parameter {', '.join(extra)}")
+        missing = sorted(f.required_parameters - set(g.params))
+        if missing:
+            problems.append(f"{where}.params: '{g.function}' needs {', '.join(missing)}")
+    pbp = spec.analysis.point_by_point_comparison
+    if pbp is not None:
+        usable = (all_time_series_metrics() if pbp.time_series is not None else {}) | (
+            POINT_METRICS if pbp.data_profiles else {}
+        )
+        for m in pbp.metric_choices:
+            where = f"analysis.point_by_point_comparison.metrics.{m.name}"
+            metric = usable.get(m.name)
+            if metric is None:
+                problems.append(f"{where}: unknown metric (known: {', '.join(usable)})")
+                continue
+            extra = sorted(set(m.params) - (metric.parameters - {"time"}))
+            if extra:
+                problems.append(f"{where}.params: '{m.name}' has no parameter {', '.join(extra)}")
+            if pbp.data_profiles and m.name not in POINT_METRICS:
+                problems.append(f"{where}: a time-series metric cannot be used on data profiles")
+    items = set(item_keys(spec))
+    columns = {c.key for c in spec.result_data.columns}
     for kind in ("overview", "detail", "comparison"):
         for i, panel in enumerate(getattr(spec.analysis.dashboards, kind)):
             where = f"analysis.dashboards.{kind}[{i}]"
@@ -186,12 +216,13 @@ def _check_analysis(spec: CmeSpec) -> list[str]:
                 names = ", ".join(extra)
                 problems.append(f"{where}.options: '{panel.visual}' has no option {names}")
             for opt, known_keys, what in [
-                *((o, kpi_keys, "KPI") for o in v.kpi_options),
+                *((o, items, "compared item") for o in v.item_options),
                 *((o, columns, "column") for o in v.column_options),
             ]:
                 value = panel.options.get(opt)
-                given = [value] if isinstance(value, str) else list(value or [])
-                bad = [n for n in given if n != "all" and n not in known_keys]
+                given_names = [value] if isinstance(value, str) else list(value or [])
+                special = {"all", "general", "aggregates"} if what == "compared item" else {"all"}
+                bad = [n for n in given_names if n not in special and n not in known_keys]
                 if bad:
                     problems.append(f"{where}.options.{opt}: not a {what} key: {', '.join(bad)}")
     return problems

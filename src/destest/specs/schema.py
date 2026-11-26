@@ -424,17 +424,105 @@ class Locations(_Strict):
         return v
 
 
-class KpiSpec(_Strict):
-    """One KPI: a KPI function (see `destest.analysis.kpis`) applied to one column."""
+class DeviationLimits(_Strict):
+    """When a value is highlighted: beyond `acceptable` (yellow), beyond `critical` (red).
+
+    `mode`: `relative` (deviation in % of the reference) or `absolute` (difference from the
+    reference, in the unit of the value). Default: relative for values compared with the
+    median of all submissions, absolute for targets and ideal values of metrics.
+    """
+
+    acceptable: float = Field(ge=0)
+    critical: float = Field(ge=0)
+    mode: Literal["relative", "absolute"] | None = Field(default=None)
+
+    @model_validator(mode="after")
+    def _order(self) -> "DeviationLimits":
+        if self.critical < self.acceptable:
+            raise ValueError("critical must be at least acceptable")
+        return self
+
+
+class GeneralComparisonSpec(_Strict):
+    """One value per submission: a general-comparison function on one or more columns.
+
+    See `destest.analysis.general_comparison` (data aggregates and physics checks).
+    """
 
     key: str = Field(pattern=_KEY)
     label: str = Field(min_length=1)
-    column: str  # column key in result_data.columns
-    function: str  # name of a KPI function
-    unit: str = ""
+    function: str  # name of a general-comparison function
+    #: One input series (column key): the `values` of a data aggregate ...
+    column: str | None = Field(default=None)
+    #: ... or several, by input name: e.g. {power: Q_supplied, m_flow: m_flow_supply_i}
+    inputs: dict[str, str] = Field(default_factory=dict)
     params: dict[str, Any] = Field(default_factory=dict)  # keyword parameters of the function
-    #: Weight of the KPI in the closeness-to-the-reference grade (0 = shown, not counted).
+    unit: str = Field(default="")
+    #: Known ideal value (physics checks): compared with it instead of the median of all.
+    target: float | None = Field(default=None)
+    #: Weight in the accuracy grade (0 = shown, not counted).
     weight: float = Field(default=1.0, ge=0)
+    #: Highlight limits (default: `default_limits` of the analysis section).
+    limits: DeviationLimits | None = Field(default=None)
+
+    @model_validator(mode="after")
+    def _one_source(self) -> "GeneralComparisonSpec":
+        if (self.column is None) == (not self.inputs):
+            raise ValueError("give either `column` (one series) or `inputs` (several)")
+        return self
+
+    @property
+    def columns_by_input(self) -> dict[str, str]:
+        """Input name -> column key."""
+        return {"values": self.column} if self.column is not None else dict(self.inputs)
+
+
+class MetricChoiceSpec(_Strict):
+    """A comparison metric (see `destest.analysis.point_by_point_comparison`) and its weight."""
+
+    name: str
+    weight: float = Field(default=1.0, ge=0)
+    params: dict[str, Any] = Field(default_factory=dict)
+    #: Highlight limits on the metric value (distance to its ideal value, in its unit).
+    limits: DeviationLimits | None = Field(default=None)
+
+
+class TimeSeriesComparisonSpec(_Strict):
+    """Which columns are compared as time series with the reference time series."""
+
+    columns: Literal["all"] | list[str] = Field(default="all")
+
+
+class DataProfileSpec(_Strict):
+    """A data profile: values of several columns read as one series (e.g. along a network)."""
+
+    key: str = Field(pattern=_KEY)
+    label: str = Field(min_length=1)
+    points: list[str] = Field(min_length=2)  # column keys, in order
+    positions: list[str] | None = Field(default=None)  # labels of the points, e.g. node names
+    unit: str = Field(default="")
+    aggregate: Literal["mean", "last"] = "mean"  # one value per column (mean = steady state)
+
+    @model_validator(mode="after")
+    def _positions(self) -> "DataProfileSpec":
+        if self.positions is not None and len(self.positions) != len(self.points):
+            raise ValueError("positions: one label per point")
+        return self
+
+
+class PointByPointComparisonSpec(_Strict):
+    """Series compared point by point with the reference series, and the metrics used."""
+
+    metrics: list[str | MetricChoiceSpec] = Field(min_length=1)
+    time_series: TimeSeriesComparisonSpec | None = Field(default=None)
+    data_profiles: list[DataProfileSpec] = Field(default_factory=list)
+
+    @property
+    def metric_choices(self) -> list[MetricChoiceSpec]:
+        """The metrics, each with its weight and parameters."""
+        return [
+            m if isinstance(m, MetricChoiceSpec) else MetricChoiceSpec(name=m) for m in self.metrics
+        ]
 
 
 class PanelSpec(_Strict):
@@ -455,24 +543,32 @@ class DashboardsSpec(_Strict):
 
 
 class AnalysisSpec(_Strict):
-    """KPIs and dashboards of a CME."""
+    """What is compared in a CME, and its dashboards."""
 
     reference: Literal["median", "mean"] = "median"
     #: Why this reference, or anything to know about it (shown with the reference).
     reference_note: str = Field(default="")
+    #: Highlight limits of the values compared with the median that have none of their own.
+    default_limits: DeviationLimits | None = Field(default=None)
     #: Comments and observations on the results, one bullet each (end of the overview).
     comments_and_observations: list[str] = Field(default_factory=list)
-    kpis: list[KpiSpec] = Field(min_length=1)
+    general_comparison: list[GeneralComparisonSpec] = Field(min_length=1)
+    point_by_point_comparison: PointByPointComparisonSpec | None = Field(default=None)
     dashboards: DashboardsSpec = DashboardsSpec()
 
     @model_validator(mode="after")
     def _unique(self) -> "AnalysisSpec":
-        keys = [k.key for k in self.kpis]
+        pbp = self.point_by_point_comparison
+        profiles = pbp.data_profiles if pbp is not None else []
+        keys = [g.key for g in self.general_comparison] + [p.key for p in profiles]
         doubles = sorted({k for k in keys if keys.count(k) > 1})
         if doubles:
-            raise ValueError(f"kpis: key used more than once: {', '.join(doubles)}")
-        if not any(k.weight > 0 for k in self.kpis):
-            raise ValueError("kpis: at least one KPI needs a weight above 0")
+            raise ValueError(f"key used more than once: {', '.join(doubles)}")
+        weights = [g.weight for g in self.general_comparison]
+        if pbp is not None and (pbp.time_series is not None or pbp.data_profiles):
+            weights += [m.weight for m in pbp.metric_choices]
+        if not any(w > 0 for w in weights):
+            raise ValueError("at least one compared item needs a weight above 0")
         return self
 
 
@@ -486,13 +582,41 @@ class CmeSpec(_Strict):
     analysis: AnalysisSpec | None = None
 
     @model_validator(mode="after")
-    def _kpi_columns(self) -> "CmeSpec":
-        if self.analysis is not None:
-            columns = {c.key for c in self.result_data.columns}
-            for k in self.analysis.kpis:
-                if k.column not in columns:
-                    raise ValueError(f"analysis.kpis.{k.key}.column: '{k.column}' is not a column")
+    def _analysis_columns(self) -> "CmeSpec":
+        if self.analysis is None:
+            return self
+        columns = {c.key for c in self.result_data.columns}
+        bad: list[str] = []
+        for g in self.analysis.general_comparison:
+            where = f"analysis.general_comparison.{g.key}"
+            bad += [
+                f"{where}.{'column' if g.column else 'inputs.' + name}: '{col}' is not a column"
+                for name, col in g.columns_by_input.items()
+                if col not in columns
+            ]
+        pbp = self.analysis.point_by_point_comparison
+        if pbp is not None:
+            ts = pbp.time_series
+            if ts is not None and ts.columns != "all":
+                where = "analysis.point_by_point_comparison.time_series.columns"
+                bad += [f"{where}: '{c}' is not a column" for c in ts.columns if c not in columns]
+            for p in pbp.data_profiles:
+                where = f"analysis.point_by_point_comparison.data_profiles.{p.key}.points"
+                bad += [f"{where}: '{c}' is not a column" for c in p.points if c not in columns]
+        if bad:
+            raise ValueError("; ".join(bad))
         return self
+
+    @property
+    def compared_columns(self) -> list[str]:
+        """Columns compared as time series (all but the time column if `columns: all`)."""
+        pbp = self.analysis.point_by_point_comparison if self.analysis else None
+        if pbp is None or pbp.time_series is None:
+            return []
+        if pbp.time_series.columns != "all":
+            return list(pbp.time_series.columns)
+        time = self.result_data.time.column if self.result_data.time else None
+        return [c.key for c in self.result_data.columns if c.key != time]
 
     @property
     def folder_name(self) -> str:

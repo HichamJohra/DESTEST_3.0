@@ -100,8 +100,16 @@ Generated from the docstrings in `src/destest`.
 
 ## Analysis and dashboards
 
-::: destest.analysis.kpis
-::: destest.analysis.accuracy_metric
+::: destest.analysis.general_comparison.data_aggregates
+::: destest.analysis.general_comparison.physics_check
+::: destest.analysis.point_by_point_comparison.point_by_point_difference
+::: destest.analysis.point_by_point_comparison.time_series
+::: destest.analysis.point_by_point_comparison.data_profiles
+::: destest.analysis.point_by_point_comparison.reference_time_series
+::: destest.analysis.point_by_point_comparison.reference_data_profiles
+::: destest.analysis.point_by_point_comparison.time_series_to_reference
+::: destest.analysis.point_by_point_comparison.data_profiles_to_reference
+::: destest.analysis.accuracy_grade.closeness
 ::: destest.analysis.context
 ::: destest.analysis.visuals
 ::: destest.analysis.dashboard

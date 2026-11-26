@@ -11,6 +11,7 @@ from typing import Any
 from dash import ALL, MATCH, Input, Output, State, clientside_callback, dcc, html
 
 from ..analysis import Dashboard, Panel, Table, describe_reference
+from ..analysis.context import result_items
 from ..analysis.timeline import Timeline
 from ..analysis.visuals import Choice
 from ..specs.schema import CmeSpec
@@ -230,16 +231,17 @@ def render_dashboard(board: Dashboard) -> list[Any]:
     return [render_panel(p, f"{board.kind}-{i}") for i, p in enumerate(board.panels)]
 
 
-def _kpi_summary(spec: CmeSpec) -> str:
-    """E.g. `18 compared with the reference; all weight 1 in the closeness grade`."""
-    assert spec.analysis is not None
-    kpis = spec.analysis.kpis
-    weights = sorted({k.weight for k in kpis})
+def _comparison_summary(spec: CmeSpec) -> str:
+    """E.g. `25 compared items (21 values, 4 series metrics); all weight 1 in the grade`."""
+    items = result_items(spec)
+    n_series = sum(1 for i in items if i.metric is not None)
+    weights = sorted({i.weight for i in items})
     if len(weights) == 1:
-        how = f"all weight {weights[0]:g} in the closeness grade"
+        how = f"all weight {weights[0]:g} in the accuracy grade"
     else:
-        how = "weighted in the closeness grade (see the KPI table)"
-    return f"{len(kpis)} compared with the reference; {how}"
+        how = "weighted in the accuracy grade (see the results table)"
+    parts = f"{len(items) - n_series} values, {n_series} series metrics"
+    return f"{len(items)} compared items ({parts}); {how}"
 
 
 def cme_info_card(spec: CmeSpec, n_submissions: int) -> html.Div:
@@ -252,7 +254,7 @@ def cme_info_card(spec: CmeSpec, n_submissions: int) -> html.Div:
             reference += [html.Br(), html.Span(spec.analysis.reference_note, className="muted")]
         rows += [
             ("Reference", reference),
-            ("KPIs", _kpi_summary(spec)),
+            ("Compared items", _comparison_summary(spec)),
         ]
     rows += [("Status", info.status)]
     if info.description_reference:

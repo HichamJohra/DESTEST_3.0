@@ -25,7 +25,7 @@ uv run destest web --debug --results "Result data"
 
 The pages contain no exercise-specific code. Each dashboard page builds the dashboard listed in
 the CME's spec file (`analysis.dashboards.overview`, `.detail`, `.comparison`) and renders every
-panel in order: figures as interactive Plotly graphs, tables as HTML tables. Adding a KPI or a
+panel in order: figures as interactive Plotly graphs, tables as HTML tables. Adding a compared item or a
 visual to a CME's `analysis` section, or adding a new CME with an `analysis` section, shows up
 in the app without changing the web code. See [Dashboards](dashboards.md).
 

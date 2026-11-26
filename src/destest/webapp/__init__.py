@@ -10,7 +10,8 @@ webapp/
 ```
 
 The pages only display what `destest.analysis` builds from the CME spec files: adding a
-KPI or a visual to a CME's `analysis` section shows it in the web app without code changes.
+compared item or a visual to a CME's `analysis` section shows it in the web app without
+code changes.
 
 Needs the `web` dependency group (`uv sync` installs it). Run with `destest web`.
 """
