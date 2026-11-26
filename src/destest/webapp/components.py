@@ -230,6 +230,18 @@ def render_dashboard(board: Dashboard) -> list[Any]:
     return [render_panel(p, f"{board.kind}-{i}") for i, p in enumerate(board.panels)]
 
 
+def _kpi_summary(spec: CmeSpec) -> str:
+    """E.g. `18 compared with the reference; all weight 1 in the closeness grade`."""
+    assert spec.analysis is not None
+    kpis = spec.analysis.kpis
+    weights = sorted({k.weight for k in kpis})
+    if len(weights) == 1:
+        how = f"all weight {weights[0]:g} in the closeness grade"
+    else:
+        how = "weighted in the closeness grade (see the KPI table)"
+    return f"{len(kpis)} compared with the reference; {how}"
+
+
 def cme_info_card(spec: CmeSpec, n_submissions: int) -> html.Div:
     """Description, key characteristics and reference of a CME, from its spec file."""
     info = spec.cme
@@ -240,7 +252,7 @@ def cme_info_card(spec: CmeSpec, n_submissions: int) -> html.Div:
             reference += [html.Br(), html.Span(spec.analysis.reference_note, className="muted")]
         rows += [
             ("Reference", reference),
-            ("KPIs", f"{len(spec.analysis.kpis)} compared with the reference"),
+            ("KPIs", _kpi_summary(spec)),
         ]
     rows += [("Status", info.status)]
     if info.description_reference:

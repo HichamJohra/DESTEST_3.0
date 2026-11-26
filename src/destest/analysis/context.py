@@ -181,7 +181,12 @@ def build_context(
         scores = closeness_scores({s.id: kpi_values[s.id][k.key] for s in every}, reference[k.key])
         for sid, score in scores.items():
             kpi_scores[sid][k.key] = score
-    closeness = {sid: closeness_grade(list(sc.values())) for sid, sc in kpi_scores.items()}
+    # The grade: the mean of the KPI scores, weighted by `weight` in the spec file.
+    weights = [k.weight for k in analysis.kpis]
+    closeness = {
+        sid: closeness_grade([sc.get(k.key) for k in analysis.kpis], weights)
+        for sid, sc in kpi_scores.items()
+    }
     return AnalysisContext(
         spec=spec,
         submissions=submissions,

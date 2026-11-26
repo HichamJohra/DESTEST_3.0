@@ -53,7 +53,7 @@ def test_invalid_files_are_skipped_and_cache_follows_changes(
     data._cache.clear()
     assert data.get_cme("CME_DHN_1").submissions == []
     bad = folder / "ResultData_DESTEST_CME_DHN_1_T_1_I_A_B_2022_01_01_12_00_00.csv"
-    bad.write_text("Time [s]\n0\n", encoding="utf-8")
+    bad.write_text("Elapsed time [s]\n0\n", encoding="utf-8")
     skipped = data.get_cme("CME_DHN_1").skipped
     assert [name for name, _ in skipped] == [bad.name]
     if RESULT_DATA.is_dir():  # a valid pair appears after a change in the folder

@@ -88,7 +88,7 @@ result_data:
   #   range      plausible values: min and/or max (leave one out for no limit)
   columns:
     - key: time
-      header: "Time [s]"
+      header: "Elapsed time [s]"
       unit: s
 
     - key: m_flow_supply_i
@@ -297,7 +297,8 @@ result_metadata:
 # =============================================================================
 # Building blocks (shared by all CMEs, see the docs page "Dashboards"):
 #   function  a KPI function from destest/analysis/kpis.py, e.g. steady_state, mean,
-#             integral; `params` passes its keyword parameters
+#             integral; `params` passes its keyword parameters; `weight` is the KPI's
+#             share in the closeness grade (default 1, 0 = shown but not counted)
 #   visual    a table or figure from destest/analysis/visuals.py, e.g. kpi_table,
 #             deviation_heatmap, kpi_bar, profile, time_series, carpet,
 #             metadata_table, data_check_table, closeness_bar, contributions_map,
@@ -320,114 +321,132 @@ analysis:
 
   # The 18 results of Table 8 in the case report, as steady-state values
   # (mean of the reported time steps; all are constant in a steady-state run).
-  kpis:
+  kpis:                        # weight: share in the closeness grade (0 = not counted)
     - key: m_flow_supply_i
       label: Mass flow rate supply i
       column: m_flow_supply_i
       function: steady_state
       unit: kg/h
+      weight: 1
 
     - key: dp_supply_i_e
       label: Pressure drop supply i-e
       column: dp_supply_i_e
       function: steady_state
       unit: Pa
+      weight: 1
 
     - key: dp_return_a_i
       label: Pressure drop return a-i
       column: dp_return_a_i
       function: steady_state
       unit: Pa
+      weight: 1
 
     - key: dp_return_i_h
       label: Pressure drop return i-h
       column: dp_return_i_h
       function: steady_state
       unit: Pa
+      weight: 1
 
     - key: T_supply_i
       label: Supply temperature i
       column: T_supply_i
       function: steady_state
       unit: degC
+      weight: 1
 
     - key: T_supply_h
       label: Supply temperature h
       column: T_supply_h
       function: steady_state
       unit: degC
+      weight: 1
 
     - key: T_supply_g
       label: Supply temperature g
       column: T_supply_g
       function: steady_state
       unit: degC
+      weight: 1
 
     - key: T_supply_f
       label: Supply temperature f
       column: T_supply_f
       function: steady_state
       unit: degC
+      weight: 1
 
     - key: T_supply_e
       label: Supply temperature e
       column: T_supply_e
       function: steady_state
       unit: degC
+      weight: 1
 
     - key: T_supply_district
       label: Supply temperature SimpleDistrict_1
       column: T_supply_district
       function: steady_state
       unit: degC
+      weight: 1
 
     - key: T_return_i
       label: Return temperature i
       column: T_return_i
       function: steady_state
       unit: degC
+      weight: 1
 
     - key: T_return_h
       label: Return temperature h
       column: T_return_h
       function: steady_state
       unit: degC
+      weight: 1
 
     - key: T_return_g
       label: Return temperature g
       column: T_return_g
       function: steady_state
       unit: degC
+      weight: 1
 
     - key: T_return_f
       label: Return temperature f
       column: T_return_f
       function: steady_state
       unit: degC
+      weight: 1
 
     - key: T_return_e
       label: Return temperature e
       column: T_return_e
       function: steady_state
       unit: degC
+      weight: 1
 
     - key: T_return_district
       label: Return temperature SimpleDistrict_1
       column: T_return_district
       function: steady_state
       unit: degC
+      weight: 1
 
     - key: Q_loss_supply_i_h
       label: Heat loss supply i-h
       column: Q_loss_supply_i_h
       function: steady_state
       unit: W
+      weight: 1
 
     - key: Q_supplied
       label: Total heat supplied
       column: Q_supplied
       function: steady_state
       unit: W
+      weight: 1
 
   dashboards:
 

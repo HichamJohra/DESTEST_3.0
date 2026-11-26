@@ -107,7 +107,7 @@ def test_load_submission_refuses_invalid_files(tmp_path: Path) -> None:
     folder = tmp_path / "CME_DHN_1"
     folder.mkdir()
     bad = folder / "ResultData_DESTEST_CME_DHN_1_T_1_I_A_B_2022_01_01_12_00_00.csv"
-    bad.write_text("Time [s]\n0\n", encoding="utf-8")
+    bad.write_text("Elapsed time [s]\n0\n", encoding="utf-8")
     with pytest.raises(ValueError, match="content errors"):
         load_submission(bad)
     assert load_submission(bad, require_valid=False).series["time"] == [0.0]
@@ -165,9 +165,15 @@ def test_every_visual_builds_and_is_json(subs: list[Submission], name: str) -> N
 def test_kpi_table_marks_large_deviations(subs: list[Submission]) -> None:
     table = VISUALS["kpi_table"].builder(build_context(SPEC, subs), kpis=["Q_loss_supply_i_h"])
     assert isinstance(table, Table)
-    assert table.headers[1] == "Reference (median of 7)"
+    assert table.headers[1] == "Weight"
+    assert table.headers[2] == "Reference (median of 7)"
     assert table.rows[0][0] == "Closeness to the reference [0-100]"
+    assert table.rows[0][1] == "18 (sum)"  # weights of all KPIs, also those not shown
+    assert table.rows[1][1] == "1"
     assert "bad" in table.classes[1]  # SIM VICUS and TRNSYS 2021 are > 20 % off
+    no_weights = VISUALS["kpi_table"].builder(build_context(SPEC, subs), weights=False)
+    assert isinstance(no_weights, Table)
+    assert no_weights.headers[1] == "Reference (median of 7)"
 
 
 # ---- closeness to the reference ---------------------------------------------------------------
@@ -178,6 +184,10 @@ def test_closeness_scores_and_grade() -> None:
     assert closeness_scores({"a": 2.0}, None) == {"a": None}
     assert closeness_grade([100.0, 0.0, None]) == 50.0
     assert closeness_grade([None]) is None
+    assert closeness_grade([100.0, 0.0], [3.0, 1.0]) == 75.0
+    assert closeness_grade([100.0, 0.0], [1.0, 0.0]) == 100.0  # weight 0: not counted
+    with pytest.raises(ValueError, match="one weight per score"):
+        closeness_grade([100.0], [1.0, 1.0])
 
 
 @needs_results
@@ -188,10 +198,25 @@ def test_closeness_of_cme_dhn_1(subs: list[Submission]) -> None:
     worst = min(subs, key=lambda s: ctx.closeness[s.id] or 0.0)
     assert worst.label.startswith("SIM VICUS")
     assert ctx.closeness_rank(worst) == (7, 7)
-    # the grade is the mean of the 18 KPI scores
+    # the grade is the mean of the 18 KPI scores (all weights 1)
+    assert SPEC.analysis is not None
+    assert {k.weight for k in SPEC.analysis.kpis} == {1.0}
     scores = list(ctx.kpi_scores[worst.id].values())
     assert len(scores) == 18
     assert ctx.closeness[worst.id] == pytest.approx(sum(s or 0 for s in scores) / 18)
+
+
+@needs_results
+def test_kpi_weights_change_the_grade(subs: list[Submission]) -> None:
+    assert SPEC.analysis is not None
+    first = SPEC.analysis.kpis[0].key
+    kpis = [
+        k.model_copy(update={"weight": 1.0 if k.key == first else 0.0}) for k in SPEC.analysis.kpis
+    ]
+    analysis = SPEC.analysis.model_copy(update={"kpis": kpis})
+    ctx = build_context(SPEC.model_copy(update={"analysis": analysis}), subs)
+    for s in subs:  # only the first KPI counts
+        assert ctx.closeness[s.id] == ctx.kpi_scores[s.id][first]
 
 
 @needs_results
@@ -486,6 +511,8 @@ def panel(analysis: dict[str, Any], dashboard: str, visual: str) -> dict[str, An
         (lambda a: a["kpis"][0].update(params={"last": 2}), "has no parameter last"),
         (lambda a: a["kpis"][0].update(column="T_x"), "'T_x' is not a column"),
         (lambda a: a["kpis"].append(dict(a["kpis"][0])), "key used more than once"),
+        (lambda a: a["kpis"][0].update(weight=-1), "greater than or equal to 0"),
+        (lambda a: [k.update(weight=0) for k in a["kpis"]], "weight above 0"),
         (
             lambda a: panel(a, "overview", "contributions_map").update(visual="pie"),
             "unknown 'pie'",

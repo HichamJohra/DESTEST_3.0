@@ -210,7 +210,7 @@ CLOSENESS_LABEL = "Closeness to the reference [0-100]"
 CLOSENESS_NOTE = (
     "Closeness to the reference: for each KPI, the closest submission scores 100 and the "
     "furthest 0, the others linearly in between by their distance to the reference; the "
-    "grade is the mean over all KPIs."
+    "grade is the mean over all KPIs, weighted by the KPI weights."
 )
 
 
@@ -224,6 +224,7 @@ def kpi_table(
     kpis: str | list[str] = "all",
     deviation: bool = True,
     closeness: bool = True,
+    weights: bool = True,
     warn_pct: float = 5.0,
     bad_pct: float = 20.0,
 ) -> Table:
@@ -232,23 +233,32 @@ def kpi_table(
     With `deviation`, each value is followed by its deviation from the reference
     in %, and cells beyond `warn_pct` / `bad_pct` are marked. With `closeness`,
     the first row is the closeness-to-the-reference grade (0-100) over all KPIs.
+    With `weights`, the second column is each KPI's weight in that grade.
     """
     keys = ctx.kpi_keys(kpis)
-    headers = ["KPI", ctx.reference_label, *(_label(s) for s in ctx.focus)]
+    w_head = ["Weight"] if weights else []
+    headers = ["KPI", *w_head, ctx.reference_label, *(_label(s) for s in ctx.focus)]
     rows: list[list[str]] = []
     classes: list[list[str]] = []
     data: list[list[Any]] = []
     colors: list[list[str]] = []
     if closeness:
-        rows.append([CLOSENESS_LABEL, "100", *(_closeness_text(ctx, s) for s in ctx.focus)])
-        classes.append(["score", "ref score", *("score" for _ in ctx.focus)])
-        data.append([CLOSENESS_LABEL, 100.0, *(ctx.closeness.get(s.id) for s in ctx.focus)])
-        colors.append(["", "", *(_closeness_color(ctx, s) for s in ctx.focus)])
+        total = sum(k.weight for k in ctx.analysis.kpis)
+        w_text = [f"{total:g} (sum)"] if weights else []
+        w_cls = [""] if weights else []
+        w_raw: list[Any] = [total] if weights else []
+        rows.append(
+            [CLOSENESS_LABEL, *w_text, "100", *(_closeness_text(ctx, s) for s in ctx.focus)]
+        )
+        classes.append(["score", *w_cls, "ref score", *("score" for _ in ctx.focus)])
+        data.append([CLOSENESS_LABEL, *w_raw, 100.0, *(ctx.closeness.get(s.id) for s in ctx.focus)])
+        colors.append(["", *w_cls, "", *(_closeness_color(ctx, s) for s in ctx.focus)])
     for key in keys:
         ref = ctx.reference.get(key)
-        row = [ctx.kpi_label(key), fmt(ref)]
-        cls = ["", "ref"]
-        raw: list[Any] = [ctx.kpi_label(key), ref]
+        weight = ctx.kpi(key).weight
+        row = [ctx.kpi_label(key), *([f"{weight:g}"] if weights else []), fmt(ref)]
+        cls = ["", *([""] if weights else []), "ref"]
+        raw: list[Any] = [ctx.kpi_label(key), *([weight] if weights else []), ref]
         for s in ctx.focus:
             value = ctx.kpi_values[s.id].get(key)
             dev = ctx.metric("relative_deviation", s, key) if deviation else None
@@ -269,7 +279,8 @@ def kpi_table(
         )
     if closeness:
         notes.append(CLOSENESS_NOTE)
-    return Table(headers, rows, classes, data, " ".join(notes), colors=colors)
+    align = ["left", "center"] if weights else []
+    return Table(headers, rows, classes, data, " ".join(notes), align=align, colors=colors)
 
 
 @visual("metadata_table")

@@ -433,6 +433,8 @@ class KpiSpec(_Strict):
     function: str  # name of a KPI function
     unit: str = ""
     params: dict[str, Any] = Field(default_factory=dict)  # keyword parameters of the function
+    #: Weight of the KPI in the closeness-to-the-reference grade (0 = shown, not counted).
+    weight: float = Field(default=1.0, ge=0)
 
 
 class PanelSpec(_Strict):
@@ -469,6 +471,8 @@ class AnalysisSpec(_Strict):
         doubles = sorted({k for k in keys if keys.count(k) > 1})
         if doubles:
             raise ValueError(f"kpis: key used more than once: {', '.join(doubles)}")
+        if not any(k.weight > 0 for k in self.kpis):
+            raise ValueError("kpis: at least one KPI needs a weight above 0")
         return self
 
 

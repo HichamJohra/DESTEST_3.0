@@ -58,7 +58,7 @@ def test_cme_dhn_1_content() -> None:
     spec = load_cme_spec("DHN", 1)
     cols = spec.result_data.columns
     assert len(cols) == 19
-    assert cols[0].header == "Time [s]"
+    assert cols[0].header == "Elapsed time [s]"
     assert spec.result_data.time is not None
     assert spec.result_data.time.column == "time"
     assert spec.result_data.rows.max == 10

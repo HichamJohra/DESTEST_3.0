@@ -48,7 +48,7 @@ draws its figures with plotly.js, loaded from the internet.
 | Name | What | Main options |
 |---|---|---|
 | `data_check_table` | per submission: creation date, `destest check` status, closeness grade, errors and warnings (short) | `closeness` |
-| `kpi_table` | KPI values, one column per submission, with deviation and the closeness grade | `kpis`, `deviation`, `closeness`, `warn_pct`, `bad_pct` |
+| `kpi_table` | KPI values, one column per submission, with deviation, KPI weights and the closeness grade | `kpis`, `deviation`, `closeness`, `weights`, `warn_pct`, `bad_pct` |
 | `metadata_table` | metadata side by side (`sections: all` for the whole file) | `sections` |
 | `closeness_bar` | closeness grade, best first; the shown ones in colour, others grey | `colors` (`submission`, `rank`), `submissions` (`all`, `selected`: only the shown ones, rank among all) |
 | `contributions_map` | map at the institutions' cities; a "Colour by" switch picks the metadata field (one map each) | `color_by` |
@@ -67,7 +67,10 @@ One grade (0–100) per submission summarises all KPIs:
 1. for each KPI, every submission's distance to the reference |value − reference| is computed;
 2. the closest submission scores **100**, the furthest **0**, the others linearly in between:
    100 × (worst − distance) / (worst − best); if all are equally close, all score 100;
-3. the grade is the **mean of the KPI scores** (a missing KPI is left out).
+3. the grade is the **weighted mean of the KPI scores**, with each KPI's `weight` from the
+   CME spec file (default 1; 0 = shown but not counted; a missing KPI is left out).
+
+The weights are shown in the KPI table (column "Weight", with their sum in the first row).
 
 It is shown in the KPI table (first row, with the rank), in the submissions table and in
 `closeness_bar`. The scores are relative: on a KPI where all submissions agree almost
@@ -104,6 +107,7 @@ analysis:
       column: Q_loss_supply_i_h       # column key in result_data.columns
       function: steady_state          # a KPI function
       unit: W
+      weight: 1                       # share in the closeness grade (default 1)
   dashboards:
     overview:
       - visual: kpi_bar

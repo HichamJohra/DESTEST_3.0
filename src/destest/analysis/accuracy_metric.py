@@ -165,11 +165,21 @@ def closeness_scores(
     }
 
 
-def closeness_grade(scores: Sequence[float | None]) -> float | None:
-    """Mean of the per-KPI scores of one submission (missing scores left out).
+def closeness_grade(
+    scores: Sequence[float | None], weights: Sequence[float] | None = None
+) -> float | None:
+    """Weighted mean of the per-KPI scores of one submission (missing scores left out).
+
+    `weights`: one per score (default: all 1).
 
     >>> closeness_grade([100.0, 50.0, None])
     75.0
+    >>> closeness_grade([100.0, 50.0], [3.0, 1.0])
+    87.5
     """
-    v = [s for s in scores if s is not None]
-    return sum(v) / len(v) if v else None
+    w = list(weights) if weights is not None else [1.0] * len(scores)
+    if len(w) != len(scores):
+        raise ValueError("closeness_grade: one weight per score")
+    pairs = [(s, wi) for s, wi in zip(scores, w, strict=True) if s is not None and wi > 0]
+    total = sum(wi for _, wi in pairs)
+    return sum(s * wi for s, wi in pairs) / total if total else None

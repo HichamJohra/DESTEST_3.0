@@ -6,7 +6,7 @@ written: the number of rows is up to the modeller.
 
     >>> from destest.data_check import make_data_template
     >>> make_data_template("DHN", 1).split(",")[:2]
-    ['Time [s]', 'Mass flow rate supply i [kg/h]']
+    ['Elapsed time [s]', 'Mass flow rate supply i [kg/h]']
 """
 
 import csv
