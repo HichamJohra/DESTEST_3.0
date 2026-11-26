@@ -51,7 +51,8 @@ def _result_files() -> list[Path]:
 def test_submitted_files_have_no_content_errors(path: Path) -> None:
     r = check_data(path)
     assert [str(i) for i in r.errors] == []
-    assert r.n_rows == 10
+    _, series, number = path.parent.name.split("_")
+    assert r.n_rows == load_cme_spec(series, int(number)).result_data.rows.expected
 
 
 # ---- a good file -------------------------------------------------------------------

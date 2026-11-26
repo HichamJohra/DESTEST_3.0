@@ -4,7 +4,8 @@ Two kinds, both registered by name for use in the spec files:
 
 * **value metrics** compare one KPI value with the reference value of that KPI;
 * **series metrics** compare a whole time series with the reference time series
-  (point by point), as in the DESTEST comparison tool.
+  (point by point), as in the DESTEST comparison tool. It also works with data
+  point series that are not time series per se
 
 The reference is built from all submissions of a CME: the median (default) or the
 mean, value by value or point by point (`reference_value`, `reference_series`).

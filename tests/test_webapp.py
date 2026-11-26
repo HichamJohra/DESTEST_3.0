@@ -24,7 +24,7 @@ def results(monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
 # ---- data layer (no Dash needed) ----------------------------------------------------------------
 @needs_results
 def test_cmes_and_submissions(results: Path) -> None:
-    assert "CME_DHN_1" in data.cme_names()
+    assert data.cme_names() == ["CME_DHN_1", "CME_DHN_2"]
     cme = data.get_cme("CME_DHN_1")
     assert len(cme.submissions) == 7
     assert cme.skipped == []
@@ -157,7 +157,7 @@ def test_home_switch_options(app: Any) -> None:
     assert home._map("institution")["layout"]["legend"]["title"]["text"] == "Institution"
     pie = home._pie("tool")["data"][0]
     assert pie["type"] == "pie"
-    assert sum(pie["values"]) == 7
+    assert sum(pie["values"]) == 8  # 7 in CME_DHN_1 + 1 in CME_DHN_2
 
 
 @needs_results

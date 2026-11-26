@@ -538,3 +538,27 @@ def test_analysis_section_is_checked(tmp_path: Path, change: Any, expected: str)
     p.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
     with pytest.raises(SpecError, match=expected):
         load_cme_spec_file(p)
+
+
+# ---- CME_DHN_2 (dynamic network, old Network_1) --------------------------------------------------
+DHN_2 = RESULT_DATA / "CME_DHN_2"
+
+
+@pytest.mark.skipif(not DHN_2.is_dir(), reason="no CME_DHN_2 results")
+def test_cme_dhn_2_kpis_and_dashboards() -> None:
+    spec = load_cme_spec("DHN", 2)
+    assert spec.analysis is not None
+    subs = load_cme_submissions(DHN_2)
+    assert len(subs) == 1
+    sub = subs[0]
+    assert len(sub.series["T_supply_district"]) == 673
+    ctx = build_context(spec, subs)
+    kpis = ctx.kpi_values[sub.id]
+    assert kpis["E_delivered_district"] == pytest.approx(866.0, abs=0.5)  # kWh in the week
+    assert kpis["E_loss_total"] == pytest.approx(739.5, abs=0.5)
+    assert kpis["m_flow_return_district"] == pytest.approx(148.4, abs=0.5)  # kg/h
+    assert ctx.closeness[sub.id] == 100.0  # alone: it is the reference
+    for kind, focus in (("overview", None), ("detail", subs), ("comparison", subs)):
+        board = build_dashboard(spec, subs, kind, focus)
+        assert len(board.panels) == len(getattr(spec.analysis.dashboards, kind))
+        json.dumps(board.to_dict())
