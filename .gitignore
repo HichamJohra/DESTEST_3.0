@@ -30,6 +30,8 @@ desktop.ini
 .env
 # local MCP server settings (e.g. PyCharm)
 .mcp.json*
+# local Claude Code settings
+.claude/
 
 # --- Generated output ---
 # documentation build (mkdocs build) and reports written by scripts/
