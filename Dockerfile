@@ -14,14 +14,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # 1. Dependencies only (cached as long as pyproject.toml and uv.lock do not change):
-#    the package's own dependencies + the "web" group, no development tools.
+#    the package's own dependencies + the "web" group only (no dev or docs groups).
 COPY pyproject.toml uv.lock README.md LICENSE ./
-RUN uv sync --locked --no-dev --group web --no-install-project
+RUN uv sync --locked --no-default-groups --group web --no-install-project
 
 # 2. The package and the results shown by the app
 COPY src ./src
 COPY ["Result data", "/app/Result data"]
-RUN uv sync --locked --no-dev --group web
+RUN uv sync --locked --no-default-groups --group web
 
 ENV PATH="/app/.venv/bin:$PATH" \
     DESTEST_RESULTS="/app/Result data"
