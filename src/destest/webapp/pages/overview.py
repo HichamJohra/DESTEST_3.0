@@ -5,7 +5,16 @@ from typing import Any
 import dash
 from dash import Input, Output, callback, dcc, html
 
-from ..components import card, control, message, page_head, render_dashboard, skipped_notice
+from ..components import (
+    card,
+    cme_info_card,
+    comments_card,
+    control,
+    message,
+    page_head,
+    render_dashboard,
+    skipped_notice,
+)
 from ..data import cme_names, dashboard, get_cme
 
 
@@ -45,10 +54,16 @@ def _overview(cme: str | None) -> list[Any]:
     if not cme:
         return [message("No exercise selected.", "warn")]
     data = get_cme(cme)
+    info = cme_info_card(data.spec, len(data.submissions))
     if not data.submissions:
-        return [skipped_notice(data.skipped), message("No valid submission yet.", "info")]
+        return [info, skipped_notice(data.skipped), message("No valid submission yet.", "info")]
     try:
         board = dashboard(cme, "overview")
     except ValueError as exc:
-        return [message(str(exc), "error")]
-    return [skipped_notice(data.skipped), *render_dashboard(board)]
+        return [info, message(str(exc), "error")]
+    return [
+        info,
+        skipped_notice(data.skipped),
+        *render_dashboard(board),
+        comments_card(data.spec),
+    ]

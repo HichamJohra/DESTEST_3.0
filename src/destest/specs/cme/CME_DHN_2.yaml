@@ -1,0 +1,632 @@
+# =============================================================================
+# DESTEST 3.0 - Content rules for CME DHN 2
+# =============================================================================
+# Dynamic simulation of the district heating network (old "Network_1", CE 1 of the
+# case report). Built on CME_DHN_1 (same network); see that file for the shared rules.
+# Read by destest (content checks of ResultData and ResultMetadata files, dashboards).
+# Checked on load against the rules in destest/specs/schema.py.
+# Values marked "TO BE AGREED" are proposals.
+#
+# Severity of a failed rule:  error   -> file is rejected
+#                             warning -> file is accepted, the issue is reported
+# =============================================================================
+
+schema_version: 1
+
+cme:
+  series: DHN
+  exercise_number: 2
+  full_title: Dynamic simulation of a district heating network
+  description_reference: >-
+    DESTEST case report (IBPSA Project 1, WP3), draft 16 Oct 2026,
+    section "Common exercise 1: Dynamic simulation of a district heating network" (Network_1)
+  status: draft
+  description: >-
+    Models the network of CME_DHN_1 in a more realistic, transient way: the heat load of
+    each building is a time-dependent profile, and the valve of each substation regulates the
+    mass flow to keep a constant temperature difference over the heat exchanger. The focus is
+    the transient modelling of heat losses, temperature distribution and pressure distribution
+    in the network, over one week.
+  characteristics:                 # label: value, shown in this order
+    Simulation: Dynamic, 7 days (604 800 s) from 2018-01-01 00:00
+    District: 16 identical single-family dwellings in two streets (as CME_DHN_1)
+    Network: Radial, supply and return pipes, nodes a to i, all at 1.5 m depth (as CME_DHN_1)
+    Heat source: Ideal source at node i, constant supply temperature 70 °C
+    Heat load: Same profile for all 16 buildings, 600 s resolution (heat_profile_1_building_SFH_Network_1)
+    Substations: Valve keeps 30 K over an ideal heat exchanger; outlet not below 28 °C; closes without demand
+    Control: Well-tuned P or PI controllers recommended (pre-calculated mass flow allowed)
+    Heat loss: Constant 10 °C at the outer insulation surface, ground not modelled
+    Fluid: Water at 50 °C, constant properties (as CME_DHN_1)
+    Results: 9 time series every 900 s (673 rows, 0 to 604 800 s)
+
+# =============================================================================
+# ResultData file (.csv)
+# =============================================================================
+result_data:
+
+  file:
+    extension: .csv
+    encoding: utf-8            # a UTF-8 byte-order mark (Excel export) is accepted
+    delimiter: ","
+    decimal: "."
+    header_rows: 1
+
+  rows:                        # data rows, header not counted
+    min: 2                     # error if fewer
+    expected: 673              # warning if different: 0 to 604 800 s every 900 s
+    max: 673                   # error if more
+
+  header:
+    match: exact               # every column name must be exactly as in `columns` (error otherwise)
+    order: strict              # columns must be in the order of `columns`
+    extra_columns: error       # error | warning | ignore
+
+  # Rules applied to every column unless the column overrides them.
+  column_defaults:
+    type: number
+    missing_values:
+      - ""
+      - " "
+      - "NaN"
+      - "nan"
+      - "NA"
+    all_missing: error         # a column with no value at all
+    max_missing_fraction: 0    # share of missing values allowed (0 = none)
+    on_missing: error
+
+  time:
+    column: time
+    unit: s
+    start: 0
+    step: 900
+    strictly_increasing: true
+
+  on_out_of_range: warning     # what happens when a value is outside a column's `range`
+
+  # One entry per column, in file order (Table "8" of CE 1 in the case report).
+  #   key        short id used in code and reports
+  #   header     exact text expected in the CSV header
+  #   unit       for reference (it is also part of the header text)
+  #   range      plausible values: min and/or max (leave one out for no limit)
+  columns:
+    - key: time
+      header: "Elapsed time [s]"
+      unit: s
+
+    - key: T_supply_district
+      header: "Fluid temperature supply SimpleDistrict_1 [C]"
+      unit: degC
+      range:
+        min: 0
+        max: 120
+
+    - key: T_return_district
+      header: "Fluid temperature return SimpleDistrict_1 [C]"
+      unit: degC
+      range:
+        min: 0
+        max: 120
+
+    - key: T_return_i
+      header: "Fluid temperature return i [C]"
+      unit: degC
+      range:
+        min: 0
+        max: 120
+
+    - key: m_flow_return_district
+      header: "Mass flow rate return SimpleDistrict_1 [kg/h]"
+      unit: kg/h
+      range:
+        min: 0
+
+    - key: Q_delivered_district
+      header: "Actual delivered heat SimpleDistrict_1 [W]"
+      unit: W
+      range:
+        min: 0
+
+    - key: Q_loss_supply_i_h
+      header: "Heat loss supply between i and h [W]"
+      unit: W
+      range:
+        min: 0
+
+    - key: Q_loss_total
+      header: "Total heat loss network [W]"
+      unit: W
+      range:
+        min: 0
+
+    - key: dp_substation_district
+      header: "Pressure drop between supply and return SimpleDistrict_1 [Pa]"
+      unit: Pa
+      range:
+        min: 0
+
+    - key: dp_return_i_h
+      header: "Pressure drop return between i and h [Pa]"
+      unit: Pa
+      range:
+        min: 0
+
+  # Checks across columns (optional), row by row. None yet for this dynamic exercise:
+  # the substation heat balance does not hold row by row during transients and no-flow
+  # periods. TO BE AGREED.
+  consistency: []
+
+# =============================================================================
+# ResultMetadata file (.yaml)
+# =============================================================================
+# The sections and fields used in every CME (submission_info, modeller,
+# modelling_tool, deviations, other_comments) are defined once, in
+# specs/result_metadata.yaml. Here: the fields of the two sections that are
+# defined per CME. Each field becomes one key in the ResultMetadata file.
+#   key          the key in the ResultMetadata file
+#   required     true: must be filled in; false: may be left empty ("")
+#   description  shown in the template, to tell the modeller what to write
+result_metadata:
+
+  simulation_config:
+    - key: solver
+      required: false
+      description: Solver / numerical method, e.g. DASSL, Euler, Newton-Raphson
+
+    - key: time_step_s
+      required: true
+      description: Simulation time step [s]; "variable" if adaptive
+
+    - key: tolerance
+      required: false
+      description: Solver tolerance, e.g. 1e-6
+
+    - key: computation_time_s
+      required: false
+      description: Wall-clock time of the run [s]
+
+    - key: computer_configuration
+      required: false
+      description: Computer used, e.g. Intel i7-1365U, 32 GB RAM, Windows 11
+
+  # Modelling choices made for THIS result that the CME description leaves open.
+  # Fixed by the description (not asked): network and pipes as CME_DHN_1, fluid
+  # properties, 10 C at the outer insulation surface, 70 C supply, the heat load
+  # profile, 30 K over the substation, outlet not below 28 C.
+  model_details:
+    - key: pipe_model
+      required: false
+      description: e.g. plug-flow pipe, finite-volume pipe
+
+    - key: pipe_discretisation
+      required: false
+      description: e.g. 10 volumes per pipe; "none" for plug-flow
+
+    - key: pipe_wall_thermal_capacity
+      required: false
+      description: Included or neglected
+
+    - key: friction_factor_correlation
+      required: false
+      description: e.g. Colebrook-White, Swamee-Jain, Haaland
+
+    - key: heat_loss_calculation
+      required: false
+      description: How the heat loss through pipe wall and insulation is computed
+
+    - key: fluid_properties_used
+      required: false
+      description: e.g. constant, as in the description; or what was used instead
+
+    - key: substation_model
+      required: false
+      description: e.g. control valve + ideal heat extractor, ideal pump with prescribed mass flow
+
+    - key: substation_control
+      required: false
+      description: e.g. PI controller on the temperature difference (gains), pre-calculated mass flow
+
+    - key: minimum_flow_rate
+      required: false
+      description: Bypass or leakage flow when the valve is closed, e.g. 1.77 kg/h
+
+    - key: outlet_temperature_limit
+      required: false
+      description: How the 28 C minimum outlet temperature is applied; "not applied" if it is not
+
+    - key: initialisation
+      required: false
+      description: Initial temperatures and pressures, warm-up period before t = 0
+
+# =============================================================================
+# Analysis: what is compared, and the dashboards
+# =============================================================================
+# Building blocks (shared by all CMEs, see the docs pages "Dashboards" and "Comparison
+# metrics"):
+#   general_comparison        one value per submission (destest/analysis/general_comparison):
+#     function   a data aggregate (steady_state, mean, integral, ...) or a physics check
+#                (heat_balance_error, temperature_difference, relative_difference,
+#                time_steps_below)
+#     column     its one input series, or `inputs` (input name -> column) for several
+#     params     its keyword parameters; `target`: known ideal value (physics checks),
+#                otherwise the value is compared with the median of all submissions
+#     weight     share in the accuracy grade (default 1, 0 = shown but not counted)
+#   point_by_point_comparison series against the reference series, point by point
+#     metrics    comparison metrics of Technical Report 314 (MBE, CVRMSE, ...), each with
+#                an optional weight; `time_series`: columns compared as time series;
+#                `data_profiles`: columns read as one profile (e.g. along the network)
+#   visual    a table or figure from destest/analysis/visuals.py, e.g. results_table,
+#             deviation_heatmap, value_bar, profile, time_series, carpet,
+#             metadata_table, data_check_table, closeness_bar, contributions_map,
+#             contributions_timeline, contributions_pie;
+#             `options` are its keyword options
+# Checked on load: unknown functions, metrics, visuals, options or keys are errors.
+analysis:
+
+  reference: median            # reference = median of all submissions, point by point
+  reference_note: >-
+    There is no measured or analytical truth for this exercise. The reference is the median
+    of all valid submissions, value by value for the compared values and time step by time step for the
+    time series, so that a single outlying result does not shift it.
+
+  # Highlight limits (TO BE AGREED): values beyond `acceptable` are yellow, beyond `critical`
+  # red. `default_limits` apply to the values compared with the median (deviation in % of
+  # the median); targets and metrics have their own (difference in their unit).
+  default_limits:
+    acceptable: 5
+    critical: 20
+
+  # Comments and observations on the results, one bullet each (last card of the overview).
+  comments_and_observations:
+    - Comment 1
+    - Comment 2
+    - Observation 1
+    - Observation 2
+
+  # One value per time series: weekly mean, or weekly energy in kWh (integral of the
+  # power), compared with the median of all submissions; then the physics checks.
+  general_comparison:          # weight: share in the accuracy grade (0 = not counted)
+    - key: T_supply_district
+      label: Mean supply temperature SimpleDistrict_1
+      column: T_supply_district
+      function: mean
+      unit: degC
+      weight: 1
+
+    - key: T_return_district
+      label: Mean return temperature SimpleDistrict_1
+      column: T_return_district
+      function: mean
+      unit: degC
+      weight: 1
+
+    - key: T_return_i
+      label: Mean return temperature i
+      column: T_return_i
+      function: mean
+      unit: degC
+      weight: 1
+
+    - key: m_flow_return_district
+      label: Mean mass flow rate SimpleDistrict_1
+      column: m_flow_return_district
+      function: mean
+      unit: kg/h
+      weight: 1
+
+    - key: E_delivered_district
+      label: Heat delivered SimpleDistrict_1 (week)
+      column: Q_delivered_district
+      function: integral
+      params:
+        to_unit: kWh                     # integral of W over s (J), in kWh
+      unit: kWh
+      weight: 1
+
+    - key: E_loss_supply_i_h
+      label: Heat loss supply i-h (week)
+      column: Q_loss_supply_i_h
+      function: integral
+      params:
+        to_unit: kWh                     # integral of W over s (J), in kWh
+      unit: kWh
+      weight: 1
+
+    - key: E_loss_total
+      label: Total network heat loss (week)
+      column: Q_loss_total
+      function: integral
+      params:
+        to_unit: kWh                     # integral of W over s (J), in kWh
+      unit: kWh
+      weight: 1
+
+    - key: dp_substation_district
+      label: Mean pressure drop supply-return SimpleDistrict_1
+      column: dp_substation_district
+      function: mean
+      unit: Pa
+      weight: 1
+
+    - key: dp_return_i_h
+      label: Mean pressure drop return i-h
+      column: dp_return_i_h
+      function: mean
+      unit: Pa
+      weight: 1
+
+    # Physics checks: compared with a known target, not with the median of all.
+    # "With flow": above 1 % of the nominal substation flow (555.4 kg/h), i.e. 5.6 kg/h.
+    - key: substation_temperature_difference
+      label: Temperature difference over substation SimpleDistrict_1 (with flow)
+      function: temperature_difference
+      inputs:
+        T_hot: T_supply_district
+        T_cold: T_return_district
+        m_flow: m_flow_return_district
+      params:
+        min_flow: 5.6
+      unit: K
+      target: 30
+      weight: 1
+      limits:                  # difference from 30 K, in K
+        acceptable: 0.5
+        critical: 2
+
+    - key: heat_balance_district
+      label: Heat balance at SimpleDistrict_1 (Q vs m cp dT, with flow)
+      function: heat_balance_error
+      inputs:
+        power: Q_delivered_district
+        m_flow: m_flow_return_district
+        T_hot: T_supply_district
+        T_cold: T_return_district
+      params:
+        cp: 4180
+        m_flow_unit: kg/h
+        min_flow: 5.6
+      unit: "%"
+      target: 0
+      weight: 1
+      limits:                  # difference from 0 %, in %-points
+        acceptable: 0.5
+        critical: 2
+
+    - key: outlet_below_28C
+      label: Time steps with the substation outlet below 28 C (with flow)
+      function: time_steps_below
+      inputs:
+        values: T_return_district
+        m_flow: m_flow_return_district
+      params:
+        threshold: 28
+        tolerance: 0.1
+        min_flow: 5.6
+      unit: time steps
+      target: 0
+      weight: 1
+      limits:                  # number of 15-min time steps
+        acceptable: 0
+        critical: 4
+
+  # Series compared point by point with the reference time series (median of all
+  # submissions, time step by time step).
+  point_by_point_comparison:
+    metrics:                   # Technical Report 314 names; weight 1 each by default
+      - MBE                    # no limits: its unit differs per column
+      - name: CVRMSE
+        limits:                # in %; indicative, cf. ASHRAE Guideline 14 (30 % hourly)
+          acceptable: 15
+          critical: 30
+    time_series:
+      columns: all             # every column but the time column
+
+  dashboards:
+
+    # All submissions of the CME
+    overview:
+      - visual: closeness_bar
+        title: Ranking by closeness to target
+        description: Grade 0-100 over all compared items, best first (see the results summary for the details).
+        options:
+          colors: rank
+
+      - visual: data_check_table
+        title: Contributions
+        options:
+          first_column: Contributions
+
+      - visual: contributions_map
+        title: Mapping contributions
+        options:
+          color_by:                  # one option each in the "Colour by" switch
+            - modelling_tool.name
+            - modeller.institution
+
+      - visual: contributions_timeline
+        title: Contributions over time
+        options:
+          color_by:
+            - tool
+            - institution
+            - country
+
+      - visual: contributions_pie
+        title: Distribution of contributions
+        options:
+          color_by:
+            - tool
+            - institution
+            - country
+
+      - visual: results_table
+        title: Results summary
+        options:
+          items: all
+          deviation: true
+
+      - visual: deviation_heatmap
+        title: Deviation from the median [%]
+        options:
+          items: aggregates       # data aggregates only (not the physics checks)
+          metric: relative_deviation
+
+      - visual: deviation_heatmap
+        title: CVRMSE of the time series against the reference [%]
+        description: Coefficient of variation of the RMSE, time step by time step, per variable.
+        options:
+          items:                   # one per column (the weekly values of the 9 series)
+            - T_supply_district
+            - T_return_district
+            - T_return_i
+            - m_flow_return_district
+            - E_delivered_district
+            - E_loss_supply_i_h
+            - E_loss_total
+            - dp_substation_district
+            - dp_return_i_h
+          metric: CVRMSE
+
+      - visual: time_series
+        title: Temperatures
+        options:
+          columns:
+            - T_supply_district
+            - T_return_district
+            - T_return_i
+          show_reference: true
+
+      - visual: time_series
+        title: Mass flow and delivered heat at SimpleDistrict_1
+        options:
+          columns:
+            - m_flow_return_district
+            - Q_delivered_district
+          show_reference: true
+
+      - visual: time_series
+        title: Heat losses
+        options:
+          columns:
+            - Q_loss_supply_i_h
+            - Q_loss_total
+          show_reference: true
+
+      - visual: time_series
+        title: Pressure drops
+        options:
+          columns:
+            - dp_substation_district
+            - dp_return_i_h
+          show_reference: true
+
+      - visual: value_bar
+        title: Weekly energies
+        options:
+          items:
+            - E_delivered_district
+            - E_loss_supply_i_h
+            - E_loss_total
+
+    # One submission against the reference
+    detail:
+      - visual: closeness_bar
+        title: Ranking by closeness to target
+        description: Grade 0-100 over all compared items; colour and rank among all submissions of the CME.
+        options:
+          colors: rank
+          submissions: selected
+
+      - visual: data_check_table
+        title: Submission
+        description: Creation date, result of `destest check` and closeness to target.
+
+      - visual: results_table
+        title: Results summary
+        options:
+          items: all
+          deviation: true
+
+      - visual: time_series
+        title: Time series against the reference
+        options:
+          columns:
+            - T_supply_district
+            - T_return_district
+            - T_return_i
+            - m_flow_return_district
+            - Q_delivered_district
+            - Q_loss_supply_i_h
+            - Q_loss_total
+            - dp_substation_district
+            - dp_return_i_h
+          show_reference: true
+
+      - visual: carpet
+        title: Delivered heat at SimpleDistrict_1, day by day
+        options:
+          column: Q_delivered_district
+          period: 96
+          x_title: Quarter of an hour of the day
+          y_title: Day
+
+      - visual: metadata_table
+        title: Metadata
+        description: The complete ResultMetadata file of this submission.
+        options:
+          sections: all
+
+    # A selection of submissions against the reference
+    comparison:
+      - visual: closeness_bar
+        title: Ranking by closeness to target
+        description: Grade 0-100 over all compared items, best first; colour and rank among all submissions.
+        options:
+          colors: rank
+          submissions: selected
+
+      - visual: data_check_table
+        title: Submissions
+        description: Creation date, result of `destest check` and closeness to target.
+
+      - visual: results_table
+        title: Results summary
+        options:
+          items: all
+          deviation: true
+
+      - visual: deviation_heatmap
+        title: CVRMSE of the time series against the reference [%]
+        options:
+          items:                   # one per column (the weekly values of the 9 series)
+            - T_supply_district
+            - T_return_district
+            - T_return_i
+            - m_flow_return_district
+            - E_delivered_district
+            - E_loss_supply_i_h
+            - E_loss_total
+            - dp_substation_district
+            - dp_return_i_h
+          metric: CVRMSE
+
+      - visual: time_series
+        title: Temperatures
+        options:
+          columns:
+            - T_supply_district
+            - T_return_district
+            - T_return_i
+          show_reference: true
+
+      - visual: time_series
+        title: Heat delivered and heat losses
+        options:
+          columns:
+            - Q_delivered_district
+            - Q_loss_supply_i_h
+            - Q_loss_total
+          show_reference: true
+
+      - visual: metadata_table
+        title: Model and simulation, side by side
+        description: Differences in modelling choices often explain differences in results.

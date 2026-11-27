@@ -189,3 +189,38 @@ ol li { margin-bottom: 8px; }
 
 /* Maps fill the card width */
 .card .js-plotly-plot, .card .dash-graph { width: 100%; }
+
+/* "Colour by" switch (dcc.RadioItems with className "toggle"): segmented buttons */
+.toggle-row { display: flex; align-items: center; gap: 10px; }
+/* Card title with tools (e.g. a toggle) at its right end */
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+             flex-wrap: wrap; margin-bottom: 10px; }
+.card-head .card-title { margin: 0; }
+.control-label.inline { display: inline; margin: 0; }
+.toggle { display: inline-flex; border: 1px solid var(--accent); border-radius: 6px; overflow: hidden; }
+.toggle label { margin: 0; padding: 4px 12px; cursor: pointer; font-size: .85rem; color: var(--accent); }
+.toggle label + label { border-left: 1px solid var(--accent); }
+.toggle input { display: none; }
+.toggle label:has(input:checked) { background: var(--accent); color: #fff; }
+
+/* Submissions over time: month columns of flat squares (as GitHub's activity graph).
+   The scroll box is right-to-left so it opens at the right end (the current month). */
+.timeline-scroll { overflow-x: auto; direction: rtl; padding-bottom: 4px; }
+.timeline { direction: ltr; display: inline-flex; gap: 3px; align-items: flex-end; padding: 2px; }
+.tl-col { display: flex; flex-direction: column; gap: 3px; width: 14px; }
+.tl-stack { display: flex; flex-direction: column-reverse; gap: 3px; }
+.tl-cell { width: 14px; height: 14px; border-radius: 3px; }
+.tl-empty { background: #ebedf0; }
+.tl-label { height: 16px; font-size: .72rem; color: var(--muted); white-space: nowrap; overflow: visible; }
+.tl-year { font-weight: 600; color: var(--text, #222); }
+.legend-row { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: .82rem;
+              color: var(--muted); }
+.legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.legend-item i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
+
+/* Frozen first column: the item / submission names stay visible when scrolling sideways.
+   :where() keeps the white background below the cell classes (ref, warn, bad, score). */
+.data-table th:first-child, .data-table td:first-child { position: sticky; left: 0; z-index: 1;
+  box-shadow: 1px 0 0 var(--border); }
+.data-table th:first-child { z-index: 2; }
+.data-table td:where(:first-child) { background: var(--card, #fff); }

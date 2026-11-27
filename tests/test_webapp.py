@@ -24,7 +24,7 @@ def results(monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
 # ---- data layer (no Dash needed) ----------------------------------------------------------------
 @needs_results
 def test_cmes_and_submissions(results: Path) -> None:
-    assert "CME_DHN_1" in data.cme_names()
+    assert data.cme_names() == ["CME_DHN_1", "CME_DHN_2"]
     cme = data.get_cme("CME_DHN_1")
     assert len(cme.submissions) == 7
     assert cme.skipped == []
@@ -53,7 +53,7 @@ def test_invalid_files_are_skipped_and_cache_follows_changes(
     data._cache.clear()
     assert data.get_cme("CME_DHN_1").submissions == []
     bad = folder / "ResultData_DESTEST_CME_DHN_1_T_1_I_A_B_2022_01_01_12_00_00.csv"
-    bad.write_text("Time [s]\n0\n", encoding="utf-8")
+    bad.write_text("Elapsed time [s]\n0\n", encoding="utf-8")
     skipped = data.get_cme("CME_DHN_1").skipped
     assert [name for name, _ in skipped] == [bad.name]
     if RESULT_DATA.is_dir():  # a valid pair appears after a change in the folder
@@ -103,6 +103,70 @@ def test_callbacks_build_the_dashboards(app: Any) -> None:
     assert len(selected) == comparison.DEFAULT_SELECTION
     assert len(comparison._comparison("CME_DHN_1", selected)) > 3
     assert "Choose" in str(comparison._comparison("CME_DHN_1", []))
+
+
+@needs_results
+def test_cme_info_card_comes_first(app: Any) -> None:
+    from destest.webapp.pages import comparison, detail, overview
+
+    for content in (
+        overview._overview("CME_DHN_1"),
+        detail._detail("CME_DHN_1", None),
+        comparison._comparison("CME_DHN_1", []),
+    ):
+        text = str(content[0])
+        assert "Steady-state simulation of a district heating network" in text
+        assert "Median of all valid submissions" in text
+        assert "Heat source" in text
+
+
+@needs_results
+def test_home_map_and_timeline_toggles(app: Any) -> None:
+    from destest.webapp.pages import home
+
+    assert home._map("tool")["layout"]["legend"]["title"]["text"] == "Modelling tool"
+    assert home._map("cme")["data"][0]["name"] == "CME_DHN_1"
+    by_cme, by_tool = str(home._timeline("cme")), str(home._timeline("tool"))
+    assert "timeline-scroll" in by_cme
+    assert "tl-cell" in by_cme
+    assert "CME_DHN_1" in by_cme
+    assert "TRNSYS" in by_tool
+
+
+@needs_results
+def test_overview_map_switch_and_timeline(app: Any) -> None:
+    from destest.webapp.pages import overview
+
+    text = str(overview._overview("CME_DHN_1"))
+    assert "Mapping contributions" in text
+    assert "choice-switch" in text
+    assert "Contributions over time" in text
+    assert "timeline-scroll" in text
+    assert "choice-html-switch" in text
+    assert "Institution" in text
+    assert "Country" in text
+    assert "Distribution of contributions" in text
+
+
+@needs_results
+def test_home_switch_options(app: Any) -> None:
+    from destest.webapp.pages import home
+
+    assert list(home.MAP_OPTIONS) == ["cme", "tool", "institution"]
+    assert "AAU" in str(home._timeline("institution"))
+    assert home._map("institution")["layout"]["legend"]["title"]["text"] == "Institution"
+    pie = home._pie("tool")["data"][0]
+    assert pie["type"] == "pie"
+    assert sum(pie["values"]) == 8  # 7 in CME_DHN_1 + 1 in CME_DHN_2
+
+
+@needs_results
+def test_comments_card_ends_the_overview(app: Any) -> None:
+    from destest.webapp.pages import overview
+
+    last = str(overview._overview("CME_DHN_1")[-1])
+    assert "Comments and observations" in last
+    assert "Comment 1" in last
 
 
 def test_render_table() -> None:

@@ -64,8 +64,10 @@ def layout(**_: Any) -> html.Div:
                 [
                     html.P(
                         "Overview: all submissions. Detail: one submission. Comparison: a "
-                        "selection. Deviations are relative to the reference; cells are marked "
-                        "from 5 % (yellow) and 20 % (red)."
+                        "selection. Each compared item has a target: the median of all "
+                        "submissions, a set target (physics checks) or the ideal value of a "
+                        "metric. Values beyond the acceptable deviation are yellow, beyond the "
+                        "critical deviation red (limits set per exercise)."
                     ),
                     html.P(CLOSENESS_NOTE),
                 ],

@@ -29,7 +29,7 @@ desktop.ini
 # --- Local secrets / settings ---
 .env
 # local MCP server settings (e.g. PyCharm)
-.mcp.json
+.mcp.json*
 
 # --- Generated output ---
 # documentation build (mkdocs build) and reports written by scripts/

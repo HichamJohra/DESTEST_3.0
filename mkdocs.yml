@@ -35,6 +35,7 @@ nav:
   - Naming convention: naming-convention.md
   - ResultMetadata files: result-metadata.md
   - Dashboards: dashboards.md
+  - Comparison metrics: comparison-metrics.md
   - Web app: web-app.md
   - Project structure: project-structure.md
   - Development: development.md

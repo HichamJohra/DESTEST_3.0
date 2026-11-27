@@ -1,0 +1,94 @@
+# =============================================================================
+# DESTEST 3.0 - ResultMetadata file for CME_DHN_2
+# Dynamic simulation of a district heating network
+# =============================================================================
+# PRE-FILLED by the DESTEST organisers on 26 Nov 2026 from the original result file
+# (Modelica_Buildings_AAU_Alessandro_Network_2.csv) and the DESTEST case report.
+# Values 'TO BE PROVIDED BY THE MODELLER' are not known yet.
+# One ResultMetadata file per ResultData file; it describes that one submission.
+# Save it next to the ResultData file, with the same name except:
+#   ResultData_....csv  ->  ResultMetadata_....yaml
+# Keep EVERY key and the indentation; only change the values.
+# A missing or an extra key is an error. 'required' values must be filled in.
+# Write text that looks like a number in quotes, e.g. "18.40".
+# This file is published in a PUBLIC repository.
+# =============================================================================
+
+metadata_format_version: 1              # do not change
+
+# -----------------------------------------------------------------------------
+# submission_info
+# -----------------------------------------------------------------------------
+submission_info:
+  cme: "CME_DHN_2"                      # required - The CME, e.g. CME_DHN_1; must match the folder and the file name
+  result_data_file: "ResultData_DESTEST_CME_DHN_2_Modelica_Buildings_AAU_Alessandro_Maccarini_2022_04_05_12_45_14.csv" # required - Name of the ResultData file this file describes
+  creation_date_time: 2022-04-05 12:45:14 # required - Date and time the ResultData file was created, as in its name (YYYY-MM-DD hh:mm:ss)
+
+# -----------------------------------------------------------------------------
+# modeller
+# -----------------------------------------------------------------------------
+modeller:
+  first_name: "Alessandro"              # required - Same as in the file name
+  last_name: "Maccarini"                # required - Same as in the file name
+  institution: "AAU"                    # required - Short form, same as in the file name
+  institution_full_name: "Aalborg University" # required - e.g. Technische Universitaet Dresden
+  institution_city: "TO BE PROVIDED BY THE MODELLER" # required - e.g. Dresden (for the map of contributions)
+  institution_country: "Denmark"        # required - e.g. Germany
+  orcid: ""                             # optional - e.g. 0000-0002-1825-0097
+
+# -----------------------------------------------------------------------------
+# modelling_tool
+# -----------------------------------------------------------------------------
+modelling_tool:
+  name: "Modelica"                      # required - Same as in the file name
+  version: "Buildings"                  # required - Same as in the file name (write it in quotes, e.g. "18.4")
+  licence: "TO BE PROVIDED BY THE MODELLER" # required - e.g. commercial, open-source (MIT), in-house
+  url: ""                               # optional - Website of the tool
+  libraries: "Modelica Buildings library (version TO BE PROVIDED BY THE MODELLER)" # optional - Libraries / packages used, with versions, e.g. Modelica Buildings 11.0.0
+
+# -----------------------------------------------------------------------------
+# simulation_config
+# -----------------------------------------------------------------------------
+simulation_config:
+  solver: ""                            # optional - Solver / numerical method, e.g. DASSL, Euler, Newton-Raphson
+  time_step_s: "TO BE PROVIDED BY THE MODELLER" # required - Simulation time step [s]; "variable" if adaptive
+  tolerance: ""                         # optional - Solver tolerance, e.g. 1e-6
+  computation_time_s: ""                # optional - Wall-clock time of the run [s]
+  computer_configuration: ""            # optional - Computer used, e.g. Intel i7-1365U, 32 GB RAM, Windows 11
+
+# -----------------------------------------------------------------------------
+# model_details
+# -----------------------------------------------------------------------------
+model_details:
+  pipe_model: "plug-flow pipe (read from the variable names of the original file; to be confirmed)" # optional - e.g. plug-flow pipe, finite-volume pipe
+  pipe_discretisation: ""               # optional - e.g. 10 volumes per pipe; "none" for plug-flow
+  pipe_wall_thermal_capacity: ""        # optional - Included or neglected
+  friction_factor_correlation: ""       # optional - e.g. Colebrook-White, Swamee-Jain, Haaland
+  heat_loss_calculation: ""             # optional - How the heat loss through pipe wall and insulation is computed
+  fluid_properties_used: ""             # optional - e.g. constant, as in the description; or what was used instead
+  substation_model: ""                  # optional - e.g. control valve + ideal heat extractor, ideal pump with prescribed mass flow
+  substation_control: ""                # optional - e.g. PI controller on the temperature difference (gains), pre-calculated mass flow
+  minimum_flow_rate: ""                 # optional - Bypass or leakage flow when the valve is closed, e.g. 1.77 kg/h
+  outlet_temperature_limit: ""          # optional - How the 28 C minimum outlet temperature is applied; "not applied" if it is not
+  initialisation: "20 C everywhere at t = 0 (as seen in the first row of the results)" # optional - Initial temperatures and pressures, warm-up period before t = 0
+
+# -----------------------------------------------------------------------------
+# deviations
+# -----------------------------------------------------------------------------
+# required - Every way this result departs from the CME description; "none" if there is none
+deviations: |
+  TO BE CONFIRMED BY THE MODELLER. Found by the DESTEST organisers when checking the file (Nov 2026):
+  - Heat loss supply between i and h: the original column is the heat flow of the return pipe (plugFlowPipe_ret24), not the supply pipe.
+  - Pressure drop between supply and return SimpleDistrict_1: zero everywhere (pressure drop of the heat exchanger, 0 by assumption), not the pressure difference between the supply and return nodes.
+  - The 28 C minimum outlet temperature does not seem to be applied: after each no-flow period the return temperature drops to 15-23 C while about 10 kW is still delivered.
+  - Total heat loss network: heat flow into the 10 C boundary (sum of the pipe losses), not Q_source minus the sum of the heat delivered to the 16 buildings.
+  - Model initialised at 20 C at t = 0, without warm-up period.
+
+# -----------------------------------------------------------------------------
+# other_comments
+# -----------------------------------------------------------------------------
+# optional - Anything else the organisers should know
+other_comments: |
+  Converted by the DESTEST organisers on 26 Nov 2026 from Modelica_Buildings_AAU_Alessandro_Network_2.csv (old naming, file dated 2022-04-05 12:45:14, used as creation date): column headers replaced by those of the CME_DHN_2 spec (columns matched by position, in the order of the case report), mass flow converted from kg/s to kg/h (x 3600); all other values unchanged.
+  Tool name and version as read from the original file name ('Modelica', 'Buildings'); the real tool and version are to be given by the modeller.
+  The parameter file sent with the result (parameters_DESTEST_Network_2.txt) describes another exercise (single-family dwelling) and was not used.

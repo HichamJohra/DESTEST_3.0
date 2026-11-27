@@ -8,7 +8,8 @@ Sub-packages:
 - `destest.data_check`: check the content of ResultData files
 - `destest.check`: everything at once (`destest check`)
 - `destest.results`: load the submissions of a CME
-- `destest.analysis`: KPIs, metrics, visuals and dashboards (`destest dashboard`)
+- `destest.analysis`: comparisons, metrics, accuracy grade, visuals and dashboards
+  (`destest dashboard`)
 
 Command line:
 

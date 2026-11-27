@@ -15,6 +15,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Hicham Johra" }]
 requires-python = ">=3.11"
 dependencies = [
+    "numpy>=2.0",      # comparison metrics (ranks, quantiles, elastic distances)
     "pydantic>=2.11",  # checks the YAML spec files and gives clear error messages
     "pyyaml>=6.0.2",   # reads the YAML spec files
 ]

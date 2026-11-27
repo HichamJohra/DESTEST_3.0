@@ -1,13 +1,26 @@
-"""Home page: the common modelling exercises and their number of submissions."""
+"""Home page: map and timeline of the contributions, and the common modelling exercises.
+
+The map, the timeline and the pie chart each have a "Colour by" switch: exercise,
+modelling tool or institution (and country for the timeline and the pie chart).
+"""
 
 from typing import Any
 
 import dash
-from dash import dcc, html
+from dash import Input, Output, callback, dcc, html
 
-from ...analysis.maps import exercises_map
-from ..components import GRAPH_CONFIG, card, message, page_head
+from ...analysis.maps import COLOR_BY, contributions_pie, exercises_map
+from ...analysis.timeline import submission_timeline
+from ...results import Submission
+from ..components import GRAPH_CONFIG, card, message, page_head, switch, timeline_view
 from ..data import cme_names, get_cme
+
+#: Colour options of the home-page map (the timeline offers all of COLOR_BY).
+MAP_OPTIONS = {k: COLOR_BY[k] for k in ("cme", "tool", "institution")}
+
+
+def _all_submissions() -> dict[str, list[Submission]]:
+    return {n: get_cme(n).submissions for n in cme_names()}
 
 
 def _cme_card(name: str) -> html.Div:
@@ -43,15 +56,23 @@ def layout(**_: Any) -> html.Div:
         message("No common modelling exercise with an analysis section was found.", "warn")
     ]
     if names:
-        figure = exercises_map({n: get_cme(n).submissions for n in names})
-        body.insert(
-            0,
+        body[0:0] = [
             card(
-                dcc.Graph(figure=figure, config=GRAPH_CONFIG),
-                title="Contributions",
-                subtitle="Every submission at its institution's city, coloured by exercise.",
+                dcc.Graph(id="home-map", config=GRAPH_CONFIG),
+                title="Mapping contributions",
+                tools=switch("home-map-color", MAP_OPTIONS),
             ),
-        )
+            card(
+                html.Div(id="home-timeline"),
+                title="Contributions over time",
+                tools=switch("home-timeline-color", COLOR_BY),
+            ),
+            card(
+                dcc.Graph(id="home-pie", config=GRAPH_CONFIG),
+                title="Distribution of contributions",
+                tools=switch("home-pie-color", COLOR_BY),
+            ),
+        ]
     return html.Div(
         [
             page_head(
@@ -63,6 +84,21 @@ def layout(**_: Any) -> html.Div:
             *body,
         ]
     )
+
+
+@callback(Output("home-map", "figure"), Input("home-map-color", "value"))
+def _map(color_by: str | None) -> Any:
+    return exercises_map(_all_submissions(), color_by=color_by or "cme")
+
+
+@callback(Output("home-timeline", "children"), Input("home-timeline-color", "value"))
+def _timeline(color_by: str | None) -> list[Any]:
+    return timeline_view(submission_timeline(_all_submissions(), color_by=color_by or "cme"))
+
+
+@callback(Output("home-pie", "figure"), Input("home-pie-color", "value"))
+def _pie(color_by: str | None) -> Any:
+    return contributions_pie(_all_submissions(), color_by=color_by or "cme")
 
 
 dash.register_page(

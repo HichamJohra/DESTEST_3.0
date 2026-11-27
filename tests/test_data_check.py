@@ -51,7 +51,8 @@ def _result_files() -> list[Path]:
 def test_submitted_files_have_no_content_errors(path: Path) -> None:
     r = check_data(path)
     assert [str(i) for i in r.errors] == []
-    assert r.n_rows == 10
+    _, series, number = path.parent.name.split("_")
+    assert r.n_rows == load_cme_spec(series, int(number)).result_data.rows.expected
 
 
 # ---- a good file -------------------------------------------------------------------
@@ -71,15 +72,15 @@ def test_not_utf8(tmp_path: Path) -> None:
     folder = tmp_path / "CME_DHN_1"
     folder.mkdir()
     p = folder / DATA
-    p.write_bytes(_csv().replace("Time", "T\xefme").encode("latin-1"))
+    p.write_bytes(_csv().replace("Elapsed", "\xc9lapsed").encode("latin-1"))
     assert [i.field for i in check_data(p).errors] == ["file"]
 
 
 # ---- header ----------------------------------------------------------------------------
 def test_wrong_column_name() -> None:
-    text = _csv(header=HEADER.replace("Time [s]", "Time"))
+    text = _csv(header=HEADER.replace("Elapsed time [s]", "Elapsed time"))
     assert [(lvl, f) for lvl, f, _ in _issues(text)] == [
-        ("error", "header"),  # 'Time [s]' missing
+        ("error", "header"),  # 'Elapsed time [s]' missing
         ("error", "header"),  # 'Time' not in the spec
     ]
 

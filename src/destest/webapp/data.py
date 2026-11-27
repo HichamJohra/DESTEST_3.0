@@ -1,7 +1,8 @@
 """Data access for the web app: CMEs, their submissions and dashboards, cached.
 
 Results are read from the folder `RESULTS_DIR` (environment variable
-`DESTEST_RESULTS`, default `Result data` in the working directory), one
+`DESTEST_RESULTS`, default `Result data` in the working directory or else at
+the repository root), one
 sub-folder per CME (`CME_DHN_1`, ...). Loaded submissions are cached and
 reloaded automatically when a file in the CME folder changes, so adding a
 result file and refreshing the page is enough.
@@ -20,10 +21,21 @@ from ..results import Submission, load_submission
 from ..specs import list_cme_specs, load_cme_spec
 from ..specs.schema import CmeSpec
 
+#: `Result data` at the repository root (src/destest/webapp/data.py -> parents[3]).
+REPO_RESULTS = Path(__file__).resolve().parents[3] / "Result data"
+
 
 def results_dir() -> Path:
-    """Folder with one sub-folder per CME (`DESTEST_RESULTS`, default `Result data`)."""
-    return Path(os.environ.get("DESTEST_RESULTS", "Result data"))
+    """Folder with one sub-folder per CME.
+
+    `DESTEST_RESULTS` if set; otherwise `Result data` in the working directory,
+    or, if there is none (e.g. app.py run from its own folder), the one at the
+    repository root.
+    """
+    if env := os.environ.get("DESTEST_RESULTS"):
+        return Path(env)
+    local = Path("Result data")
+    return local if local.is_dir() else REPO_RESULTS
 
 
 @dataclass
